@@ -1,6 +1,4 @@
-from collections.abc import Callable, Iterable, Mapping
 import os
-from typing import Any
 import wget
 import gzip
 import threading
