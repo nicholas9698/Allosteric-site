@@ -9,6 +9,9 @@ from tqdm import tqdm
 from data_process import load_shsmu_site
 
 
+'''
+    Unzip util
+'''
 # unzip (*.pdb.gz in dir) to (new dir *.pdb)
 def unzip(origin_dir: str, outdir: str):
     if os.path.exists(origin_dir):
@@ -24,10 +27,8 @@ def unzip(origin_dir: str, outdir: str):
 
 
 """
-    Downloading data
+    Download pretrain data from rcsb
 """
-
-
 # download pretraining data from rcsb
 class DownThread(threading.Thread):
     def __init__(self, url: str, outpath: str):
@@ -208,6 +209,9 @@ def redownload_error_pretarining_data(
                 threads_group.remove(thread)
 
 
+'''
+    Download allosteric site data from shsmu.edu.cn
+'''
 # download the allosteric site form shsmu.edu.cn (feature->site)
 def download_shsmu_as(allosteric_site_path: str, outpath: str):
     base_url = (
@@ -256,8 +260,8 @@ def download_rcsb(allosteric_site_path: str, outpath: str):
 
 # unzip('../data/rcsb/', '../data/shsmu_allosteric_site/rscb_pdb/')
 # download_pretarining_data('../data/pretrain/list_file_protein_xray_max3A_1.txt', '../data/pretrain/')
-redownload_error_pretarining_data(
-    "/mnt/g/Little-LL/pertrain/timeout.log",
-    "/mnt/g/Little-LL/pertrain/wrang.log",
-    "/mnt/g/Little-LL/pertrain/",
-)
+# redownload_error_pretarining_data(
+#     "/mnt/g/Little-LL/pertrain/timeout.log",
+#     "/mnt/g/Little-LL/pertrain/wrang.log",
+#     "/mnt/g/Little-LL/pertrain/",
+# )

@@ -5,9 +5,6 @@ import pandas as pd
 from tqdm import tqdm
 
 
-"""
-    Tokenizer building part
-"""
 residue_dict = {
     "GLY": "G",
     "ALA": "A",
@@ -33,53 +30,120 @@ residue_dict = {
     "PYL": "O",
 }
 
+"""
+    Tokenizer building part
+"""
 
 # extracting residue sequence form pdb
 def extract_residue_sequence(pdb_path: str):
     result_lists = []
     item_list = []
     current_chain = ""
+    resi_order = ""
     with open(pdb_path, "r") as f:
         for line in f.readlines():
-            single = line.strip().split()
-            if single[0] == "SEQRES":
+            single = line
+            if single[0:4] == "ATOM":
                 if len(item_list) == 0:
-                    item_list.append((pdb_path.strip().split("/")[-1])[:-4])
-                    item_list.append(single[2])
-                    item_list.extend([_ for _ in single[4:]])
-                    current_chain = single[2]
-                elif single[2] == current_chain:
-                    item_list.extend([_ for _ in single[4:]])
-                elif single[2] != current_chain:
-                    if len(item_list[2]) != 3:
-                        item_list = []
-                    else:
-                        for pre in result_lists:
-                            if operator.eq(pre[2:], item_list[2:]):
-                                item_list = []
-                    if len(item_list) > 0:
+                    resi = single[17:20].strip()
+                    resi_order = single[22:26].strip()
+                    if len(resi) == 3:
+                        item_list.append((pdb_path.strip().split("/")[-1])[:-4])
+                        item_list.append(single[21])
+                        try:
+                            item_list.append(residue_dict[resi])
+                        except Exception as e:
+                            print("pdbid: {0}\tchain: {1}\terror: {2}".format(item_list[0], item_list[1], e))
+
+                        current_chain = single[21]
+                elif single[21] == current_chain and resi_order != single[22:26].strip():
+                    resi = single[17:20].strip()
+                    resi_order = single[22:26].strip()
+                    if len(resi) == 3:
+                        try:
+                            item_list.append(residue_dict[resi])
+                        except Exception as e:
+                            print("pdbid: {0}\tchain: {1}\terror: {2}".format(item_list[0], item_list[1], e))
+                elif single[21] != current_chain:
+                    for pre in result_lists:
+                        if operator.eq(pre[2:], item_list[2:]):
+                            item_list = []
+                    if len(item_list) > 2:
                         result_lists.append(item_list)
-                    item_list = []
-                    item_list.append((pdb_path.strip().split("/")[-1])[:-4])
-                    item_list.append(single[2])
-                    current_chain = single[2]
-                    item_list.extend([_ for _ in single[4:]])
-        if len(item_list[2]) != 3:
-            item_list = []
-        else:
-            for pre in result_lists:
-                if operator.eq(pre[2:], item_list[2:]):
-                    item_list = []
-        if len(item_list) > 0:
+                        item_list = []
+                    resi_order = ""
+                    
+                    resi = single[17:20].strip()
+                    if len(resi) == 3:
+                        item_list.append((pdb_path.strip().split("/")[-1])[:-4])
+                        item_list.append(single[21])
+                        try:
+                            item_list.append(residue_dict[resi])
+                        except Exception as e:
+                            print("pdbid: {0}\tchain: {1}\terror: {2}".format(item_list[0], item_list[1], e))
+                        current_chain = single[21]
+                        resi_order = single[22:26].strip()
+        for pre in result_lists:
+            if operator.eq(pre[2:], item_list[2:]):
+                item_list = []
+        if len(item_list) > 2:
             result_lists.append(item_list)
+            item_list = []
 
     return result_lists
 
 
 def build_tokenizer_dataset(path: str, outpath: str):
-    filenames = os.listdir(path)
+    filenames_total = os.listdir(path)
     data = []
+    file_count = len(filenames_total)
+    part_index = 0
+    part_idx = 0
+    while part_index + 10000 < file_count:
+        filenames = filenames_total[part_index:part_index+10000]
+        for file in tqdm(filenames):
+            if ".pdb" in file or ".ent" in file:
+                sequence_list = extract_residue_sequence(pdb_path=path + file)
+                for item in sequence_list:
+                    data.append(item)
 
+            idx = 0
+            file_idx = 0
+            max_length = len(data)
+            while idx + 10000 < max_length:
+                with open(outpath + str(part_idx) + '_' + str(file_idx) + ".json", "w") as f:
+                    for line in data[idx : idx + 10000]:
+                        json.dump(
+                            {
+                                "pdbid": line[0],
+                                "chain": line[1],
+                                "residue sequence": " ".join(line[2:]),
+                            },
+                            f,
+                            ensure_ascii=False,
+                            indent=4,
+                        )
+                        f.write("\n")
+                    idx += 10000
+                    file_idx = int(file_idx)
+                    file_idx += 1
+            with open(outpath + str(part_idx) + '_' + str(file_idx) + ".json", "w") as f:
+                for line in data[idx:max_length]:
+                    json.dump(
+                        {
+                            "pdbid": line[0],
+                            "chain": line[1],
+                            "residue sequence": " ".join(line[2:]),
+                        },
+                        f,
+                        ensure_ascii=False,
+                        indent=4,
+                    )
+                    f.write("\n")
+        part_index += 10000
+        part_idx = int(part_idx)
+        part_idx += 1
+    filenames = filenames_total[part_index:file_count]
     for file in tqdm(filenames):
         if ".pdb" in file or ".ent" in file:
             sequence_list = extract_residue_sequence(pdb_path=path + file)
@@ -90,7 +154,7 @@ def build_tokenizer_dataset(path: str, outpath: str):
         file_idx = 0
         max_length = len(data)
         while idx + 10000 < max_length:
-            with open(outpath + str(file_idx) + ".json", "w") as f:
+            with open(outpath + str(part_idx) + '_' + str(file_idx) + ".json", "w") as f:
                 for line in data[idx : idx + 10000]:
                     json.dump(
                         {
@@ -106,7 +170,7 @@ def build_tokenizer_dataset(path: str, outpath: str):
                 idx += 10000
                 file_idx = int(file_idx)
                 file_idx += 1
-        with open(outpath + str(file_idx) + ".json", "w") as f:
+        with open(outpath + str(part_idx) + '_' + str(file_idx) + ".json", "w") as f:
             for line in data[idx:max_length]:
                 json.dump(
                     {
@@ -142,7 +206,7 @@ def tokenizer_json_to_txt(path: str):
 
 
 # This file contains allosteric site description of all available entries contained in ASD
-def transform_txt_to_json(path: str, outpath: str):
+def transform_txt_to_csv(path: str, outpath: str):
     with open(path, "r") as f:
         list = []
         for line in f.readlines():
