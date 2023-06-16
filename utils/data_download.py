@@ -123,7 +123,22 @@ def download_pretarining_data(list_path: str, outpath: str):
             if thread.get_result() != 0:
                 threads_group.remove(thread)
                 break
-    threads_group.join()
+    while len(threads_group) > 0:
+        for thread in threads_group:
+            if thread.get_result() == "success":
+                succeed_count += 1
+                wtriting_to_log(outpath + "succeed.log", thread.get_url())
+            elif thread.get_result() == "timeout":
+                timeout_count += 1
+                wtriting_to_log(outpath + "timeout.log", thread.get_url())
+            elif thread.get_result() == "linkerror":
+                linkerror_count += 1
+                wtriting_to_log(outpath + "wrang.log", thread.get_url())
+            elif thread.get_result() == "unknownerror":
+                other_count += 1
+                wtriting_to_log(outpath + "wrang.log", thread.get_url())
+            if thread.get_result() != 0:
+                threads_group.remove(thread)
 
 
 def redownload_error_pretarining_data(
