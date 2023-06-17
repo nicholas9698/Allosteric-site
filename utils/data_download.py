@@ -4,19 +4,21 @@ import gzip
 import threading
 import subprocess
 from tqdm import tqdm
-from data_process import load_shsmu_site
+from utils.data_process import load_shsmu_site
 
 
-'''
+"""
     Unzip util
-'''
+"""
+
+
 # unzip (*.pdb.gz in dir) to (new dir *.pdb)
 def unzip(origin_dir: str, outdir: str):
     if os.path.exists(origin_dir):
         if not os.path.exists(outdir):
             os.mkdir(outdir)
         files = os.listdir(origin_dir)
-        for file in files:
+        for file in tqdm(files):
             if ".gz" in file:
                 filename = file.replace(".gz", "")
                 gzip_file = gzip.GzipFile(origin_dir + file)
@@ -27,6 +29,8 @@ def unzip(origin_dir: str, outdir: str):
 """
     Download pretrain data from rcsb
 """
+
+
 # download pretraining data from rcsb
 class DownThread(threading.Thread):
     def __init__(self, url: str, outpath: str):
@@ -207,9 +211,11 @@ def redownload_error_pretarining_data(
                 threads_group.remove(thread)
 
 
-'''
+"""
     Download allosteric site data from shsmu.edu.cn
-'''
+"""
+
+
 # download the allosteric site form shsmu.edu.cn (feature->site)
 def download_shsmu_as(allosteric_site_path: str, outpath: str):
     base_url = (

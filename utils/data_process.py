@@ -34,6 +34,7 @@ residue_dict = {
     Tokenizer building part
 """
 
+
 # extracting residue sequence form pdb
 def extract_residue_sequence(pdb_path: str):
     result_lists = []
@@ -53,17 +54,27 @@ def extract_residue_sequence(pdb_path: str):
                         try:
                             item_list.append(residue_dict[resi])
                         except Exception as e:
-                            print("pdbid: {0}\tchain: {1}\terror: {2}".format(item_list[0], item_list[1], e))
+                            print(
+                                "pdbid: {0}\tchain: {1}\terror: {2}".format(
+                                    item_list[0], item_list[1], e
+                                )
+                            )
 
                         current_chain = single[21]
-                elif single[21] == current_chain and resi_order != single[22:26].strip():
+                elif (
+                    single[21] == current_chain and resi_order != single[22:26].strip()
+                ):
                     resi = single[17:20].strip()
                     resi_order = single[22:26].strip()
                     if len(resi) == 3:
                         try:
                             item_list.append(residue_dict[resi])
                         except Exception as e:
-                            print("pdbid: {0}\tchain: {1}\terror: {2}".format(item_list[0], item_list[1], e))
+                            print(
+                                "pdbid: {0}\tchain: {1}\terror: {2}".format(
+                                    item_list[0], item_list[1], e
+                                )
+                            )
                 elif single[21] != current_chain:
                     for pre in result_lists:
                         if operator.eq(pre[2:], item_list[2:]):
@@ -72,7 +83,7 @@ def extract_residue_sequence(pdb_path: str):
                         result_lists.append(item_list)
                         item_list = []
                     resi_order = ""
-                    
+
                     resi = single[17:20].strip()
                     if len(resi) == 3:
                         item_list.append((pdb_path.strip().split("/")[-1])[:-4])
@@ -80,7 +91,11 @@ def extract_residue_sequence(pdb_path: str):
                         try:
                             item_list.append(residue_dict[resi])
                         except Exception as e:
-                            print("pdbid: {0}\tchain: {1}\terror: {2}".format(item_list[0], item_list[1], e))
+                            print(
+                                "pdbid: {0}\tchain: {1}\terror: {2}".format(
+                                    item_list[0], item_list[1], e
+                                )
+                            )
                         current_chain = single[21]
                         resi_order = single[22:26].strip()
         for pre in result_lists:
@@ -95,12 +110,12 @@ def extract_residue_sequence(pdb_path: str):
 
 def build_tokenizer_dataset(path: str, outpath: str):
     filenames_total = os.listdir(path)
-    data = []
     file_count = len(filenames_total)
     part_index = 0
     part_idx = 0
-    while part_index + 10000 < file_count:
-        filenames = filenames_total[part_index:part_index+10000]
+    while (part_index + 10000) < file_count:
+        data = []
+        filenames = filenames_total[part_index : part_index + 10000]
         for file in tqdm(filenames):
             if ".pdb" in file or ".ent" in file:
                 sequence_list = extract_residue_sequence(pdb_path=path + file)
@@ -110,8 +125,10 @@ def build_tokenizer_dataset(path: str, outpath: str):
             idx = 0
             file_idx = 0
             max_length = len(data)
-            while idx + 10000 < max_length:
-                with open(outpath + str(part_idx) + '_' + str(file_idx) + ".json", "w") as f:
+            while (idx + 10000) < max_length:
+                with open(
+                    outpath + str(part_idx) + "_" + str(file_idx) + ".json", "w"
+                ) as f:
                     for line in data[idx : idx + 10000]:
                         json.dump(
                             {
@@ -127,7 +144,9 @@ def build_tokenizer_dataset(path: str, outpath: str):
                     idx += 10000
                     file_idx = int(file_idx)
                     file_idx += 1
-            with open(outpath + str(part_idx) + '_' + str(file_idx) + ".json", "w") as f:
+            with open(
+                outpath + str(part_idx) + "_" + str(file_idx) + ".json", "w"
+            ) as f:
                 for line in data[idx:max_length]:
                     json.dump(
                         {
@@ -143,6 +162,7 @@ def build_tokenizer_dataset(path: str, outpath: str):
         part_index += 10000
         part_idx = int(part_idx)
         part_idx += 1
+    data = []
     filenames = filenames_total[part_index:file_count]
     for file in tqdm(filenames):
         if ".pdb" in file or ".ent" in file:
@@ -153,8 +173,10 @@ def build_tokenizer_dataset(path: str, outpath: str):
         idx = 0
         file_idx = 0
         max_length = len(data)
-        while idx + 10000 < max_length:
-            with open(outpath + str(part_idx) + '_' + str(file_idx) + ".json", "w") as f:
+        while (idx + 10000) < max_length:
+            with open(
+                outpath + str(part_idx) + "_" + str(file_idx) + ".json", "w"
+            ) as f:
                 for line in data[idx : idx + 10000]:
                     json.dump(
                         {
@@ -170,7 +192,7 @@ def build_tokenizer_dataset(path: str, outpath: str):
                 idx += 10000
                 file_idx = int(file_idx)
                 file_idx += 1
-        with open(outpath + str(part_idx) + '_' + str(file_idx) + ".json", "w") as f:
+        with open(outpath + str(part_idx) + "_" + str(file_idx) + ".json", "w") as f:
             for line in data[idx:max_length]:
                 json.dump(
                     {
@@ -199,7 +221,7 @@ def tokenizer_json_to_txt(path: str):
                         item = json.loads(js)
                         data.append(item["residue sequence"])
                         js = ""
-        with open(path + file[:-5] + "txt", "w") as f:
+        with open(path + file[:-5] + ".txt", "w") as f:
             for line in data:
                 f.writelines(line)
                 f.write("\n")
