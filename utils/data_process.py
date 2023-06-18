@@ -82,6 +82,8 @@ def extract_residue_sequence(pdb_path: str):
                     if len(item_list) > 2:
                         result_lists.append(item_list)
                         item_list = []
+                    else:
+                        item_list = []
                     resi_order = ""
 
                     resi = single[17:20].strip()
