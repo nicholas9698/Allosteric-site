@@ -426,6 +426,34 @@ def extract_residue_avg(pdb_path: str):
 
     return result_lists, position_lists, order_lists
 
+def build_allosteric_dataset(dir_path: str, outdir: str):
+    filenames = os.listdir(dir_path)
+    if not os.path.exists(outdir):
+        os.mkdir(outdir)
+
+    for file in tqdm(filenames):
+        if '.pdb' or '.ent' in file:
+            results, positions, orders = extract_residue_avg(dir_path+file)
+            dicts = []
+            with open(outdir+file[:-4]+'.json', 'w') as f:
+                for i in range(len(results)):
+                    # json.dump({
+                    #     'pdbid': (results[i])[0],
+                    #     'chain': (results[i])[1],
+                    #     'residues': ' '.join((results[i])[2:]),
+                    #     'orders': ' '.join(orders[i]),
+                    #     'positions': positions[i]
+                    # }, f, ensure_ascii=False, indent=4)
+                    # f.write('\n')
+                    dicts.append({
+                        'pdbid': (results[i])[0],
+                        'chain': (results[i])[1],
+                        'residues': ' '.join((results[i])[2:]),
+                        'orders': ' '.join(orders[i]),
+                        'positions': positions[i]
+                    })
+                json.dump(dicts, f, ensure_ascii=False, indent=4)
+                
 
 def extra_by_ncac(path: str, outpath: str):
     result_list = []
