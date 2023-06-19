@@ -253,6 +253,179 @@ def load_shsmu_site(path: str):
                 js = ""
     return data
 
+'''
+    Extract residue and compute average pisition of atom (x,y,z) from pdb
+'''
+
+def extract_residue_avg(pdb_path: str):
+    result_lists = []
+    position_lists = []
+    order_lists = []
+    item_list = []
+    x_list = []
+    y_list = []
+    z_list = []
+    avg_list = []
+    o_list = ['start']
+    current_chain = ""
+    resi_order = ""
+    with open(pdb_path, "r") as f:
+        for line in f.readlines():
+            single = line
+            if single[0:4] == "ATOM":
+                if len(item_list) == 0:
+                    resi = single[17:20].strip()
+                    resi_order = single[22:26].strip()
+                    if len(resi) == 3:
+                        item_list.append((pdb_path.strip().split("/")[-1])[:-4])
+                        item_list.append(single[21])
+                        
+                        try:
+                            item_list.append(residue_dict[resi])
+                            x_list.append(float(single[30:38].strip()))
+                            y_list.append(float(single[38:46].strip()))
+                            z_list.append(float(single[46:54].strip()))
+                            o_list.append(resi_order)
+                        except Exception as e:
+                            print(
+                                "pdbid: {0}\tchain: {1}\terror: {2}".format(
+                                    item_list[0], item_list[1], e
+                                )
+                            )
+
+                        current_chain = single[21]
+                elif single[21] == current_chain and o_list[-1] == single[22:26].strip():
+                    x_list.append(float(single[30:38].strip()))
+                    y_list.append(float(single[38:46].strip()))
+                    z_list.append(float(single[46:54].strip()))
+                elif (
+                    single[21] == current_chain and resi_order != single[22:26].strip()
+                ):
+                    if len(x_list) > 0:
+                        x_total = 0.0
+                        y_total = 0.0
+                        z_total = 0.0
+                        length = len(x_list)
+
+                        for _ in x_list:
+                            x_total += _
+                        for _ in y_list:
+                            y_total += _
+                        for _ in z_list:
+                            z_total += _
+                        avg_list.append({
+                            'x': "{:.3f}".format(x_total / length),
+                            'y': "{:.3f}".format(y_total / length),
+                            'z': "{:.3f}".format(z_total / length)
+                            })
+                        x_list = []
+                        y_list = []
+                        z_list = []
+                    resi = single[17:20].strip()
+                    resi_order = single[22:26].strip()
+                    if len(resi) == 3:
+                        try:
+                            item_list.append(residue_dict[resi])
+                            x_list.append(float(single[30:38].strip()))
+                            y_list.append(float(single[38:46].strip()))
+                            z_list.append(float(single[46:54].strip()))
+                            o_list.append(resi_order)
+                        except Exception as e:
+                            print(
+                                "pdbid: {0}\tchain: {1}\terror: {2}".format(
+                                    item_list[0], item_list[1], e
+                                )
+                            )
+                elif single[21] != current_chain:
+                    # although exist same chain, save all chain of allosteric site (Unkown which chain is experment tested)
+                    # for pre in result_lists:
+                    #     if operator.eq(pre[2:], item_list[2:]):
+                    #         item_list = []
+                    if len(x_list) > 0:
+                        x_total = 0.0
+                        y_total = 0.0
+                        z_total = 0.0
+                        length = len(x_list)
+
+                        for _ in x_list:
+                            x_total += _
+                        for _ in y_list:
+                            y_total += _
+                        for _ in z_list:
+                            z_total += _
+                        avg_list.append({
+                            'x': "{:.3f}".format(x_total / length),
+                            'y': "{:.3f}".format(y_total / length),
+                            'z': "{:.3f}".format(z_total / length)
+                            })
+                        x_list = []
+                        y_list = []
+                        z_list = []
+                    if len(item_list) > 2:
+                        result_lists.append(item_list)
+                        item_list = []
+                        order_lists.append(o_list[1:])
+                        o_list = ['start']
+                        position_lists.append(avg_list)
+                        avg_list = []
+                    else:
+                        item_list = []
+                        o_list = ['start']
+                        avg_list = []
+                    resi_order = ""
+
+                    resi = single[17:20].strip()
+                    if len(resi) == 3:
+                        item_list.append((pdb_path.strip().split("/")[-1])[:-4])
+                        item_list.append(single[21])
+                        try:
+                            item_list.append(residue_dict[resi])
+                            x_list.append(float(single[30:38].strip()))
+                            y_list.append(float(single[38:46].strip()))
+                            z_list.append(float(single[46:54].strip()))
+                            o_list.append(single[22:26].strip())
+                        except Exception as e:
+                            print(
+                                "pdbid: {0}\tchain: {1}\terror: {2}".format(
+                                    item_list[0], item_list[1], e
+                                )
+                            )
+                        current_chain = single[21]
+                        resi_order = single[22:26].strip()
+        # although exist same chain, save all chain of allosteric site (Unkown which chain is experment tested)
+        # for pre in result_lists:
+        #     if operator.eq(pre[2:], item_list[2:]):
+        #         item_list = []
+        if len(x_list) > 0:
+            x_total = 0.0
+            y_total = 0.0
+            z_total = 0.0
+            length = len(x_list)
+
+            for _ in x_list:
+                x_total += _
+            for _ in y_list:
+                y_total += _
+            for _ in z_list:
+                z_total += _
+            avg_list.append({
+                'x': "{:.3f}".format(x_total / length),
+                'y': "{:.3f}".format(y_total / length),
+                'z': "{:.3f}".format(z_total / length)
+                })
+            x_list = []
+            y_list = []
+            z_list = []
+        if len(item_list) > 2:
+            result_lists.append(item_list)
+            item_list = []
+            order_lists.append(o_list[1:])
+            o_list = ['start']
+            position_lists.append(avg_list)
+            avg_list = []
+
+    return result_lists, position_lists, order_lists
+
 
 def extra_by_ncac(path: str, outpath: str):
     result_list = []
