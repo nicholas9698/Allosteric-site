@@ -292,6 +292,11 @@ def extract_residue_avg(pdb_path: str):
                                     item_list[0], item_list[1], e
                                 )
                             )
+                            item_list.append('[UNK]')
+                            x_list.append(float(single[30:38].strip()))
+                            y_list.append(float(single[38:46].strip()))
+                            z_list.append(float(single[46:54].strip()))
+                            o_list.append(resi_order)
 
                         current_chain = single[21]
                 elif single[21] == current_chain and o_list[-1] == single[22:26].strip():
@@ -336,6 +341,11 @@ def extract_residue_avg(pdb_path: str):
                                     item_list[0], item_list[1], e
                                 )
                             )
+                            item_list.append('[UNK]')
+                            x_list.append(float(single[30:38].strip()))
+                            y_list.append(float(single[38:46].strip()))
+                            z_list.append(float(single[46:54].strip()))
+                            o_list.append(resi_order)
                 elif single[21] != current_chain:
                     # although exist same chain, save all chain of allosteric site (Unkown which chain is experment tested)
                     # for pre in result_lists:
@@ -372,7 +382,7 @@ def extract_residue_avg(pdb_path: str):
                         item_list = []
                         o_list = ['start']
                         avg_list = []
-                    resi_order = ""
+                    # resi_order = ""
 
                     resi = single[17:20].strip()
                     if len(resi) == 3:
@@ -390,8 +400,15 @@ def extract_residue_avg(pdb_path: str):
                                     item_list[0], item_list[1], e
                                 )
                             )
+                            item_list.append('[UNK]')
+                            x_list.append(float(single[30:38].strip()))
+                            y_list.append(float(single[38:46].strip()))
+                            z_list.append(float(single[46:54].strip()))
+                            o_list.append(single[22:26].strip())
                         current_chain = single[21]
                         resi_order = single[22:26].strip()
+                    else:
+                        resi_order = ""
         # although exist same chain, save all chain of allosteric site (Unkown which chain is experment tested)
         # for pre in result_lists:
         #     if operator.eq(pre[2:], item_list[2:]):
