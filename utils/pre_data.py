@@ -1,6 +1,7 @@
 import os
 import json
 from tqdm import tqdm
+from sklearn.model_selection import train_test_split
 
 
 def pre_single_a(target_dir:str, pdb_dir:str, output_json:str):
@@ -84,3 +85,10 @@ def load_data(data_path:str):
         targets.append(target)
 
     return inputs, targets
+
+def split_train_test(inputs: list, targets: list):
+    data = []
+    for i in range(len(inputs)):
+        data.append({'input':inputs[i], 'target': targets[i]})
+    train_set, test_set = train_test_split(data, test_size=0.2, random_state=42)
+    return train_set, test_set
