@@ -3,6 +3,7 @@ import os
 import operator
 import pandas as pd
 from tqdm import tqdm
+import numpy as np
 
 
 residue_dict = {
@@ -253,9 +254,11 @@ def load_shsmu_site(path: str):
                 js = ""
     return data
 
-'''
+
+"""
     Extract residue and compute average pisition of atom (x,y,z) from pdb
-'''
+"""
+
 
 def extract_residue_avg(pdb_path: str):
     result_lists = []
@@ -266,7 +269,7 @@ def extract_residue_avg(pdb_path: str):
     y_list = []
     z_list = []
     avg_list = []
-    o_list = ['start']
+    o_list = ["start"]
     current_chain = ""
     resi_order = ""
     with open(pdb_path, "r") as f:
@@ -279,7 +282,7 @@ def extract_residue_avg(pdb_path: str):
                     if len(resi) == 3:
                         item_list.append((pdb_path.strip().split("/")[-1])[:-4])
                         item_list.append(single[21])
-                        
+
                         try:
                             item_list.append(residue_dict[resi])
                             x_list.append(float(single[30:38].strip()))
@@ -299,7 +302,9 @@ def extract_residue_avg(pdb_path: str):
                             o_list.append(resi_order)
 
                         current_chain = single[21]
-                elif single[21] == current_chain and o_list[-1] == single[22:26].strip():
+                elif (
+                    single[21] == current_chain and o_list[-1] == single[22:26].strip()
+                ):
                     x_list.append(float(single[30:38].strip()))
                     y_list.append(float(single[38:46].strip()))
                     z_list.append(float(single[46:54].strip()))
@@ -318,11 +323,13 @@ def extract_residue_avg(pdb_path: str):
                             y_total += _
                         for _ in z_list:
                             z_total += _
-                        avg_list.append({
-                            'x': "{:.3f}".format(x_total / length),
-                            'y': "{:.3f}".format(y_total / length),
-                            'z': "{:.3f}".format(z_total / length)
-                            })
+                        avg_list.append(
+                            {
+                                "x": "{:.3f}".format(x_total / length),
+                                "y": "{:.3f}".format(y_total / length),
+                                "z": "{:.3f}".format(z_total / length),
+                            }
+                        )
                         x_list = []
                         y_list = []
                         z_list = []
@@ -363,11 +370,13 @@ def extract_residue_avg(pdb_path: str):
                             y_total += _
                         for _ in z_list:
                             z_total += _
-                        avg_list.append({
-                            'x': "{:.3f}".format(x_total / length),
-                            'y': "{:.3f}".format(y_total / length),
-                            'z': "{:.3f}".format(z_total / length)
-                            })
+                        avg_list.append(
+                            {
+                                "x": "{:.3f}".format(x_total / length),
+                                "y": "{:.3f}".format(y_total / length),
+                                "z": "{:.3f}".format(z_total / length),
+                            }
+                        )
                         x_list = []
                         y_list = []
                         z_list = []
@@ -375,12 +384,12 @@ def extract_residue_avg(pdb_path: str):
                         result_lists.append(item_list)
                         item_list = []
                         order_lists.append(o_list[1:])
-                        o_list = ['start']
+                        o_list = ["start"]
                         position_lists.append(avg_list)
                         avg_list = []
                     else:
                         item_list = []
-                        o_list = ['start']
+                        o_list = ["start"]
                         avg_list = []
                     # resi_order = ""
 
@@ -425,11 +434,13 @@ def extract_residue_avg(pdb_path: str):
                 y_total += _
             for _ in z_list:
                 z_total += _
-            avg_list.append({
-                'x': "{:.3f}".format(x_total / length),
-                'y': "{:.3f}".format(y_total / length),
-                'z': "{:.3f}".format(z_total / length)
-                })
+            avg_list.append(
+                {
+                    "x": "{:.3f}".format(x_total / length),
+                    "y": "{:.3f}".format(y_total / length),
+                    "z": "{:.3f}".format(z_total / length),
+                }
+            )
             x_list = []
             y_list = []
             z_list = []
@@ -437,7 +448,7 @@ def extract_residue_avg(pdb_path: str):
             result_lists.append(item_list)
             item_list = []
             order_lists.append(o_list[1:])
-            o_list = ['start']
+            o_list = ["start"]
             position_lists.append(avg_list)
             avg_list = []
 
@@ -543,3 +554,48 @@ def extra_by_ncac(path: str, outpath: str):
 # transform_txt_to_json('../data/ASD_Release_201909_AS.txt', '../data/ASD_Release_201909_AS.csv')
 # build_tokenizer_dataset(path='../data/shsmu_allosteric_site/rscb_pdb/', outpath='../data/tokenizer/')
 # tokenizer_json_to_txt('../data/tokenizer/')
+
+"""
+    Extract residue sequence from pocket
+"""
+
+
+def extract_from_fpocketPDB(pdb_path: str):
+    pdb_dic = {}
+    pdb_dic["id"] = (pdb_path.strip().split("/")[-1])[:-4]
+
+    with open(pdb_path, "r") as f:
+        for line in f.readlines():
+            single = line
+            if single[0:4] == "ATOM":
+                chainID = single[21]
+                resnanme = single[17:20].strip()
+                resi = single[22:26].strip()
+                if not chainID in pdb_dic:
+                    pdb_dic[chainID] = [resnanme + resi]
+                else:
+                    pdb_dic[chainID].append(resnanme + resi)
+                    pdb_dic[chainID] = list(set(pdb_dic[chainID]))
+
+    return pdb_dic
+
+
+def extract_from_fpocket(fpocket_path: str, save_path: str):
+    if not os.path.exists(save_path):
+        os.mkdir(save_path)
+    dir_list = os.listdir(fpocket_path)
+    pockets_all = []
+    for dir in dir_list:
+        pockets_dic = {}
+        pockets_dic["ID"] = dir
+        pockets = []
+        dir_path = os.path.join(fpocket_path, dir)
+        file_list = os.listdir(dir_path)
+        for file in file_list:
+            pockets.append(extract_from_fpocketPDB(os.path.join(dir_path, file)))
+        pockets_dic["Pockets"] = pockets
+        np.save(os.path.join(save_path, dir + ".npy"), pockets_dic)
+
+        pockets_all.append(pockets_dic)
+
+    return pockets_all
