@@ -145,6 +145,29 @@ def prepare_train_batch(data_train: list, batch_size: int):
     
     return train_inputs, train_targets
 
+def prepare_test_batch(data_train: list, batch_size: int):
+    train_pair = data_train
+    batches = []
+    pos = 0
+
+    while pos + batch_size < len(train_pair):
+        batches.append(train_pair[pos:pos+batch_size])
+        pos += batch_size
+    batches.append(train_pair[pos:])
+
+    train_inputs = []
+    train_targets = []
+    for batch in batches:
+        train_input = []
+        train_target = []
+        for item in batch:
+            train_input.append((item[0], item[1]))
+            train_target.append(item[2])
+        train_inputs.append(train_input)
+        train_targets.append(train_target)
+    
+    return train_inputs, train_targets
+
 def pad_sequence(input_ls: list, target_ls: list, tokenizer: BertTokenizer, USE_CUDA: bool):
     max_length = 0
     xyz_positions = []
