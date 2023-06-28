@@ -92,26 +92,26 @@ scheduler = get_linear_schedule_with_warmup(
 model.zero_grad()
 
 for epoch in range(n_epoch):
-    # loss_total = 0
-    # print("epoch", epoch + 1)
-    # data_batches, target_batches = prepare_train_batch(train_pair, batch_size)
-    # start_time = time.time()
-    # model.train()
-    # for idx in range(len(data_batches)):
-    #     inputs = pad_sequence(
-    #         data_batches[idx], target_batches[idx], tokenizer, USE_CUDA
-    #     )
-    #     loss = model(**inputs).loss
-    #     loss.backward()
-    #     loss_total += loss
+    loss_total = 0
+    print("epoch", epoch + 1)
+    data_batches, target_batches = prepare_train_batch(train_pair, batch_size)
+    start_time = time.time()
+    model.train()
+    for idx in range(len(data_batches)):
+        inputs = pad_sequence(
+            data_batches[idx], target_batches[idx], tokenizer, USE_CUDA
+        )
+        loss = model(**inputs).loss
+        loss.backward()
+        loss_total += loss.item()
 
-    #     optimizer.step()
-    #     model.zero_grad()
+        optimizer.step()
+        model.zero_grad()
 
-    # print("loss:", loss_total / len(data_batches))
-    # print("training time", time_since(time.time() - start_time))
-    # print("--------------------------------")
-    # scheduler.step()
+    print("loss:", loss_total / len(data_batches))
+    print("training time", time_since(time.time() - start_time))
+    print("--------------------------------")
+    scheduler.step()
 
     if (epoch + 1) % 1 == 0 or n_epoch - epoch < 6:
         start_time = time.time()

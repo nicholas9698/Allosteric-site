@@ -20,7 +20,7 @@ USE_CUDA = torch.cuda.is_available()
 
 batch_size = 2
 learning_rate = 5e-5
-weight_decay = 1e-5
+weight_decay = 1e-2
 n_epoch = 80
 seed = 42
 train_file = "data/allosteric_site/data_train.json"
@@ -73,7 +73,7 @@ optimizer_ground_paramters = [
         "weight_decay": 0.0,
     },
 ]
-optimizer = AdamW(optimizer_ground_paramters, lr=learning_rate, eps=1e-8)
+optimizer = AdamW(optimizer_ground_paramters, lr=learning_rate, eps=1e-8, betas=(0.9, 0.98))
 scheduler = get_linear_schedule_with_warmup(
     optimizer, num_warmup_steps=0.1 * n_epoch, num_training_steps=n_epoch
 )
@@ -95,7 +95,7 @@ for epoch in range(n_epoch):
         # sys.exit()
         loss = model(**inputs).loss
         loss.backward()
-        loss_total += loss
+        loss_total += loss.item()
 
         optimizer.step()
         model.zero_grad()
