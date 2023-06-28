@@ -110,6 +110,8 @@ def load_data_target(train_file: str, tokenizer: BertTokenizer):
     print("Processing data...")
     for item in tqdm(train_set):
         input = item['input']['sequence']
+        if len(input) > 1024:
+            continue
         x_s = item['input']['x_s']
         y_s = item['input']['y_s']
         z_s = item['input']['z_s']

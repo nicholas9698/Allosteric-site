@@ -5,7 +5,7 @@ import time
 import random
 import operator
 import numpy as np
-from utils.tools import time_since
+from utils.tools import time_since, get_labels
 from torch.optim import AdamW
 from transformers import BertTokenizer, get_linear_schedule_with_warmup
 from utils.pre_data import (
@@ -14,11 +14,11 @@ from utils.pre_data import (
     pad_sequence,
     prepare_test_batch,
 )
-from models.ResidueEncoderDecoderModel import ResidueEncoderDecoderModel
+from models.ResidueRobertaModel import ResidueRobertaForTokenClassification
 
 USE_CUDA = torch.cuda.is_available()
 
-batch_size = 32
+batch_size = 4
 learning_rate = 5e-5
 weight_decay = 1e-5
 n_epoch = 80
@@ -37,23 +37,11 @@ def set_seed(seed: int):
 
 set_seed(seed)
 
-model = ResidueEncoderDecoderModel.from_encoder_decoder_pretrained(
-    "models/residue-roberta", "models/residue-roberta", tie_encoder_decoder=True
-)
+model = ResidueRobertaForTokenClassification.from_pretrained("models/residue-roberta", num_labels=2)
 tokenizer = BertTokenizer.from_pretrained("models/residue-roberta")
 new_tokens = ["0", "1"]
 tokenizer.add_tokens(new_tokens)
-model.encoder.resize_token_embeddings(len(tokenizer))
-model.decoder.resize_token_embeddings(len(tokenizer))
-
-# set model's config
-model.config.decoder_start_token_id = tokenizer.cls_token_id
-model.config.pad_token_id = tokenizer.pad_token_id
-model.config.eos_token_id = tokenizer.sep_token_id
-model.config.vocab_size = model.config.decoder.vocab_size
-model.config.num_beams = 5
-model.config.max_new_tokens = 2048
-model.config.early_stopping = True
+model.resize_token_embeddings(len(tokenizer))
 
 # model size
 size = 0
@@ -64,10 +52,6 @@ print("Total parameters: {}".format(size))
 train_pair = load_data_target(train_file, tokenizer)
 test_pair = load_data_target(test_file, tokenizer)
 test_batches, test_targets = prepare_test_batch(test_pair, batch_size)
-for i in range(len(test_batches)):
-    test_batches[i] = pad_sequence(
-        test_batches[i], test_targets[i], tokenizer, USE_CUDA
-    )
 
 if USE_CUDA:
     model.cuda()
@@ -118,28 +102,26 @@ for epoch in range(n_epoch):
     print("--------------------------------")
     scheduler.step()
 
-    if (epoch + 1) % 5 == 0 or n_epoch - epoch < 6:
+    if (epoch + 1) % 1 == 0 or n_epoch - epoch < 6:
         start_time = time.time()
         model.eval()
         total = 0
         ac = 0
 
-        for idx, test_batch in enumerate(test_batches):
-            test_output = model.generate(
+        for idx, item in enumerate(test_batches):
+            test_batch = pad_sequence(item, test_targets[idx], tokenizer, USE_CUDA)
+            test_output = model(
                 input_ids=test_batch["input_ids"],
                 xyz_position=test_batch["xyz_position"],
                 attention_mask=test_batch["attention_mask"],
-                max_new_tokens=2048,
-                num_beams=5,
-                num_return_sequences=1,
+                labels=None
             )
-            test_output = tokenizer.batch_decode(test_output, skip_special_tokens=True)
+            test_output = get_labels(test_output['logits'])
 
             for i, target in enumerate(test_targets[idx]):
-                if operator.eq(test_output[i].strip().split(), target):
+                if operator.eq(test_output[i][:len(target)], target):
                     ac += 1
                 total += 1
-
         print(ac, total)
         print("test_acc", float(ac) / total)
         print("testing time", time_since(time.time() - start_time))
@@ -148,5 +130,5 @@ for epoch in range(n_epoch):
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
 
-        torch.save(model, output_dir + "model.pth")
+        model.save_pretrained(output_dir)
         tokenizer.save_pretrained(output_dir)
