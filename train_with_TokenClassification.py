@@ -11,14 +11,14 @@ from transformers import BertTokenizer, get_linear_schedule_with_warmup
 from utils.pre_data import (
     load_data_target,
     prepare_train_batch,
-    pad_sequence,
+    pad_sequence_category,
     prepare_test_batch,
 )
 from models.ResidueRobertaModel import ResidueRobertaForTokenClassification
 
 USE_CUDA = torch.cuda.is_available()
 
-batch_size = 4
+batch_size = 2
 learning_rate = 5e-5
 weight_decay = 1e-5
 n_epoch = 80
@@ -37,7 +37,7 @@ def set_seed(seed: int):
 
 set_seed(seed)
 
-model = ResidueRobertaForTokenClassification.from_pretrained("models/residue-roberta", num_labels=2)
+model = ResidueRobertaForTokenClassification.from_pretrained("models/residue-roberta", num_labels=3)
 tokenizer = BertTokenizer.from_pretrained("models/residue-roberta")
 new_tokens = ["0", "1"]
 tokenizer.add_tokens(new_tokens)
@@ -87,9 +87,12 @@ for epoch in range(n_epoch):
     start_time = time.time()
     model.train()
     for idx in range(len(data_batches)):
-        inputs = pad_sequence(
+        inputs = pad_sequence_category(
             data_batches[idx], target_batches[idx], tokenizer, USE_CUDA
         )
+        # for item in inputs['labels']:
+        #     print(item)
+        # sys.exit()
         loss = model(**inputs).loss
         loss.backward()
         loss_total += loss
@@ -109,7 +112,7 @@ for epoch in range(n_epoch):
         ac = 0
 
         for idx, item in enumerate(test_batches):
-            test_batch = pad_sequence(item, test_targets[idx], tokenizer, USE_CUDA)
+            test_batch = pad_sequence_category(item, test_targets[idx], tokenizer, USE_CUDA)
             test_output = model(
                 input_ids=test_batch["input_ids"],
                 xyz_position=test_batch["xyz_position"],

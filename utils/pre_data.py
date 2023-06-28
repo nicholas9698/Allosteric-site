@@ -34,7 +34,7 @@ def transform_data(data_path:str):
         data = json.load(load_f)
     inputs = []
     targets = []
-    for item in data:
+    for item in tqdm(data):
         residues = []
         positions = []
         orders = []
@@ -82,9 +82,15 @@ def transform_data(data_path:str):
             z_s[pos] = z_s[pos] / max_delta
         input = {'sequence': residues, 'x_s': x_s, 'y_s': y_s, 'z_s': z_s}
         inputs.append(input)
-        target = ['0' for _ in range(len(orders))]
+        # tpis: Generate the target for EncoderDecoderModel to predicted
+        # target = ['0' for _ in range(len(orders))]
+        # for t_order in temp_target:
+            # target[orders.index(t_order)] = '1'
+        
+        # tpis: Generate the target for TokenClassificationModel to category
+        target = [1 for _ in range(len(orders))]
         for t_order in temp_target:
-            target[orders.index(t_order)] = '1'
+            target[orders.index(t_order)] = 2
         
         targets.append(target)
 
@@ -190,5 +196,32 @@ def pad_sequence(input_ls: list, target_ls: list, tokenizer: BertTokenizer, USE_
         inputs = {"input_ids": input_ls.input_ids.cuda(), "xyz_position": xyz_positions.cuda(), "attention_mask": input_ls.attention_mask.cuda(), "labels": target_ls.input_ids.cuda()}
     else:
         inputs = {"input_ids": input_ls.input_ids, "xyz_position": xyz_positions, "attention_mask": input_ls.attention_mask, "labels": target_ls.input_ids}
+    
+    return inputs
+
+def pad_sequence_category(input_ls: list, target_ls: list, tokenizer: BertTokenizer, USE_CUDA: bool):
+    max_length = 0
+    xyz_positions = []
+    sequences = []
+    target_s = []
+    input_s = []
+    for item in input_ls:
+        sequences.append(item[0])
+        xyz_positions.append(item[1])
+        if max_length < len(item[0]):
+            max_length = len(item[0])
+    for i in range(len(xyz_positions)):
+        current_len = len(xyz_positions[i])
+        xyz_positions[i].extend([[0.0, 0.0, 0.0] for _ in range(max_length-current_len)])
+        target_ls[i].extend([0 for _ in range(max_length-current_len)])
+        target_s.append(target_ls[i])
+    
+    input_s = tokenizer(sequences, return_tensors="pt", add_special_tokens=False, padding=True, is_split_into_words=True)
+    target_s = torch.LongTensor(target_s)
+    xyz_positions = torch.Tensor(xyz_positions)
+    if USE_CUDA:
+        inputs = {"input_ids": input_s.input_ids.cuda(), "xyz_position": xyz_positions.cuda(), "attention_mask": input_s.attention_mask.cuda(), "labels": target_s.cuda()}
+    else:
+        inputs = {"input_ids": input_s.input_ids, "xyz_position": xyz_positions, "attention_mask": input_s.attention_mask, "labels": target_s}
     
     return inputs

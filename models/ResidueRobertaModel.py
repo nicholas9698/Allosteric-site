@@ -297,7 +297,6 @@ class ResidueRobertaForTokenClassification(RobertaForTokenClassification):
 
         sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)
-        logits = F.softmax(logits, dim=2)
 
         loss = None
         if labels is not None:
@@ -310,7 +309,7 @@ class ResidueRobertaForTokenClassification(RobertaForTokenClassification):
 
         return TokenClassifierOutput(
             loss=loss,
-            logits=logits,
+            logits=F.softmax(logits, dim=2),
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
         )
