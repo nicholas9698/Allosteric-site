@@ -153,6 +153,41 @@ def prepare_train_batch(data_train: list, batch_size: int):
     
     return train_inputs, train_targets
 
+def prepare_train_data(data_train: list):
+    train_inputs = []
+    train_targets = []
+    for item in data_train:
+        train_inputs.append((item[0], item[1]))
+        train_targets.append(item[2])
+    
+    return train_inputs, train_targets
+
+def prepare_train_batch_adjust(inputs: list, batch_size: int):
+    train_pair = copy.deepcopy(inputs)
+    random.shuffle(train_pair)
+    batches = []
+    pos = 0
+
+    while pos + batch_size < len(train_pair):
+        batches.append(train_pair[pos:pos+batch_size])
+        pos += batch_size
+    batches.append(train_pair[pos:])
+
+    final_inputs = []
+    for batch in batches:
+        input_ids = []
+        xyz_position = []
+        attention_mask = []
+        labels = []
+        for item in batch:
+            input_ids.append(item[0])
+            xyz_position.append(item[1])
+            attention_mask.append(item[2])
+            labels.append(item[3])
+        final_inputs.append({"input_ids": torch.LongTensor(input_ids), "xyz_position": torch.FloatTensor(xyz_position), 
+                             "attention_mask": torch.FloatTensor(attention_mask), "labels": torch.LongTensor(labels)})
+    return final_inputs
+
 def prepare_test_batch(data_train: list, batch_size: int):
     train_pair = data_train
     batches = []
@@ -218,10 +253,23 @@ def pad_sequence_category(input_ls: list, target_ls: list, tokenizer: BertTokeni
     
     input_s = tokenizer(sequences, return_tensors="pt", add_special_tokens=False, padding=True, is_split_into_words=True)
     target_s = torch.LongTensor(target_s)
-    xyz_positions = torch.Tensor(xyz_positions)
+    xyz_positions = torch.FloatTensor(xyz_positions)
+    
     if USE_CUDA:
         inputs = {"input_ids": input_s.input_ids.cuda(), "xyz_position": xyz_positions.cuda(), "attention_mask": input_s.attention_mask.cuda(), "labels": target_s.cuda()}
     else:
         inputs = {"input_ids": input_s.input_ids, "xyz_position": xyz_positions, "attention_mask": input_s.attention_mask, "labels": target_s}
-    
+
     return inputs
+
+def inputs_to_list(inputs:dict):
+    input_ids = inputs['input_ids'].tolist()
+    xyz_position = inputs['xyz_position'].tolist()
+    attention_mask = inputs['attention_mask'].tolist()
+    labels = inputs['labels'].tolist()
+
+    total_inputs = []
+    for i in range(len(input_ids)):
+        total_inputs.append((input_ids[i], xyz_position[i], attention_mask[i], labels[i]))
+    
+    return total_inputs

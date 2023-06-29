@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.modules import CrossEntropyLoss
+from utils.tools import compute_adjustment
 from packaging import version
 from typing import Optional, List, Union, Tuple
 from transformers import RobertaModel, RobertaForTokenClassification
@@ -266,10 +267,11 @@ class ResidueRobertaForTokenClassification(RobertaForTokenClassification):
         attention_mask: Optional[torch.FloatTensor] = None,
         token_type_ids: Optional[torch.LongTensor] = None,
         position_ids: Optional[torch.LongTensor] = None,
-        xyz_position: Optional[torch.LongTensor] = None,
+        xyz_position: Optional[torch.FloatTensor] = None,
         head_mask: Optional[torch.FloatTensor] = None,
         inputs_embeds: Optional[torch.FloatTensor] = None,
         labels: Optional[torch.LongTensor] = None,
+        adjustment: Optional[torch.FloatTensor] = None,
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
@@ -298,7 +300,13 @@ class ResidueRobertaForTokenClassification(RobertaForTokenClassification):
         sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)
 
+        # logits adjustment
+        # 2) Logit-adjusted loss
+        if adjustment is not None:
+            logits = logits + adjustment
+
         loss = None
+        
         if labels is not None:
             loss_fct = CrossEntropyLoss()
             loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
