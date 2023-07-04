@@ -7,7 +7,7 @@ from tqdm import tqdm
 from sklearn.model_selection import train_test_split
 from transformers import BertTokenizer
 
-
+# 制作数据（仅提取变构位点json中的第一条链，原始pdb中的对应链）
 def pre_single_a(target_dir:str, pdb_dir:str, output_json:str):
     target_jsons = os.listdir(target_dir)
     data = []
@@ -26,6 +26,42 @@ def pre_single_a(target_dir:str, pdb_dir:str, output_json:str):
                         data[-1]['residues'] = single['residues']
                         data[-1]['positions'] = single['positions']
                         break
+    with open(output_json, 'w') as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
+
+# 处理所有的数据
+def pre_data(target_dir:str, pdb_dir:str, output_json:str):
+    target_jsons = os.listdir(target_dir)
+    data = []
+    pdbid_chain = []
+    for target in tqdm(target_jsons):
+        with open(target_dir+target, 'r') as f:
+            ls = json.load(f)
+        with open(pdb_dir+target[-11:-7].upper()+'.json', 'r') as f:
+                origin = json.load(f)
+        for item in ls:
+            now_pdbid_chain = item['pdbid'][-6:-2]+item['chain']
+            if now_pdbid_chain not in pdbid_chain:
+                temp = {'pdbid':item['pdbid'][-6:-2], 'chain':item['chain'], 'target_orders':item['orders']}
+                data.append(temp)
+                for single in origin:
+                    if single['chain'] == (data[-1])['chain']:
+                        data[-1]['origin_orders'] = single['orders']
+                        data[-1]['residues'] = single['residues']
+                        data[-1]['positions'] = single['positions']
+                        break
+                pdbid_chain.append(now_pdbid_chain)
+            else:
+                pos = pdbid_chain.index(now_pdbid_chain)
+                temp_orders = item['orders'].strip().split()
+                previous_orders = (data[pos])['target_orders'].strip().split()
+                temp_orders.extend(previous_orders)
+                temp_orders = list(set(temp_orders))
+                temp_orders = list(map(int, temp_orders))
+                temp_orders = sorted(temp_orders)
+                temp_orders = list(map(str, temp_orders))
+                (data[pos])['target_orders'] = ' '.join(temp_orders)
+            
     with open(output_json, 'w') as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
 
