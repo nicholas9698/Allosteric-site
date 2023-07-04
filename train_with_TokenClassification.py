@@ -25,7 +25,7 @@ n_epoch = 80
 seed = 42
 train_file = "data/allosteric_site/data_train.json"
 test_file = "data/allosteric_site/data_test.json"
-output_dir = "test/"
+output_dir = "test_CrossEntropy/"
 
 
 def set_seed(seed: int):
@@ -107,11 +107,16 @@ for epoch in range(n_epoch):
     print("--------------------------------")
     scheduler.step()
 
-    if (epoch + 1) % 1 == 0 or n_epoch - epoch < 6:
+    if (epoch + 1) % 5 == 0 or n_epoch - epoch < 6:
         start_time = time.time()
         model.eval()
-        total = 0
+        sequence_acc = 0
+        sequence_total = 0
+        allosteric_total = 0
+        allosteric_ac = 0
+        fp = 0
         ac = 0
+        total = 0
 
         for idx, item in enumerate(test_batches):
             test_batch = pad_sequence_category(item, test_targets[idx], tokenizer, USE_CUDA)
@@ -119,18 +124,39 @@ for epoch in range(n_epoch):
                 input_ids=test_batch["input_ids"],
                 xyz_position=test_batch["xyz_position"],
                 attention_mask=test_batch["attention_mask"],
-                labels=None
+                labels=None,
+                adjustment=None
             )
             test_output = get_labels(test_output['logits'])
 
             for i, target in enumerate(test_targets[idx]):
-                if operator.eq(test_output[i][:len(target)], target):
-                    ac += 1
-                total += 1
-        print(ac, total)
-        print("test_acc", float(ac) / total)
+                temp = test_output[i][:len(target)]
+                if temp == target:
+                    sequence_acc += 1
+                sequence_total += 1
+                for l in range(len(temp)):
+                    if temp[l] == target[l] and target[l] == 2:
+                        allosteric_ac += 1
+                        allosteric_total += 1
+                        ac += 1
+                    elif temp[l] == target[l]:
+                        ac += 1
+                    elif target[l] == 2:
+                        allosteric_total += 1
+                        fp += 1
+                    total += 1
+        print("All residue site", ac, total)
+        print("Allosteric site", allosteric_ac, allosteric_total)
+        print("residue_acc", float(ac) / total)
+        precision = float(allosteric_ac) / (allosteric_ac + fp)
+        print("residue_precision", precision)
+        recall = float(allosteric_ac) / allosteric_total
+        print("residue_recall", recall)
+        print("residue_f1", (2 * precision * recall) / (precision + recall)) 
+        print("Sequence", sequence_acc, sequence_total)
+        print("sequence_acc", float(sequence_acc) / float(sequence_total))
         print("testing time", time_since(time.time() - start_time))
-        print("------------------------------------------------------")
+        print("-" * 100)
 
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)

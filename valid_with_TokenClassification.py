@@ -58,6 +58,7 @@ sequence_total = 0
 allosteric_total = 0
 allosteric_ac = 0
 ac = 0
+fp = 0
 total = 0
 
 for idx, item in enumerate(test_batches):
@@ -87,10 +88,14 @@ for idx, item in enumerate(test_batches):
 
             total += 1
 print("All residue site", ac, total)
-print("Sequence", sequence_acc, sequence_total)
 print("Allosteric site", allosteric_ac, allosteric_total)
 print("residue_acc", float(ac) / total)
-print("residue_recall", float(allosteric_ac) / allosteric_total)
+precision = float(allosteric_ac) / (allosteric_ac + fp)
+print("residue_precision", precision)
+recall = float(allosteric_ac) / allosteric_total
+print("residue_recall", recall)
+print("residue_f1", (2 * precision * recall) / (precision + recall)) 
+print("Sequence", sequence_acc, sequence_total)
 print("sequence_acc", float(sequence_acc) / float(sequence_total))
 print("testing time", time_since(time.time() - start_time))
-print("------------------------------------------------------")
+print("-" * 100)

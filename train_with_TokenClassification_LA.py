@@ -26,7 +26,7 @@ n_epoch = 80
 seed = 42
 train_file = "data/allosteric_site/data_train.json"
 test_file = "data/allosteric_site/data_test.json"
-output_dir = "test/"
+output_dir = "test_LogitsAdjustment/"
 
 
 def set_seed(seed: int):
@@ -131,6 +131,7 @@ for epoch in range(n_epoch):
         sequence_total = 0
         allosteric_total = 0
         allosteric_ac = 0
+        fp = 0
         ac = 0
         total = 0
 
@@ -159,15 +160,20 @@ for epoch in range(n_epoch):
                         ac += 1
                     elif target[l] == 2:
                         allosteric_total += 1
+                        fp += 1
                     total += 1
         print("All residue site", ac, total)
-        print("Sequence", sequence_acc, sequence_total)
         print("Allosteric site", allosteric_ac, allosteric_total)
         print("residue_acc", float(ac) / total)
-        print("residue_recall", float(allosteric_ac) / allosteric_total)
+        precision = float(allosteric_ac) / (allosteric_ac + fp)
+        print("residue_precision", precision)
+        recall = float(allosteric_ac) / allosteric_total
+        print("residue_recall", recall)
+        print("residue_f1", (2 * precision * recall) / (precision + recall)) 
+        print("Sequence", sequence_acc, sequence_total)
         print("sequence_acc", float(sequence_acc) / float(sequence_total))
         print("testing time", time_since(time.time() - start_time))
-        print("------------------------------------------------------")
+        print("-" * 100)
 
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
