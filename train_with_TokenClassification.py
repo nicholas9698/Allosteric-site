@@ -143,6 +143,7 @@ for epoch in range(n_epoch):
                         ac += 1
                     elif target[l] == 2:
                         allosteric_total += 1
+                    elif target[l] != 2:
                         fp += 1
                     total += 1
         print("All residue site", ac, total)
