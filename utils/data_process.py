@@ -260,7 +260,7 @@ def load_shsmu_site(path: str):
 """
 
 
-def extract_residue_avg(pdb_path: str):
+def extract_residue_avg(pdb_path: str, save_repeat_chain: bool):
     result_lists = []
     position_lists = []
     order_lists = []
@@ -295,7 +295,7 @@ def extract_residue_avg(pdb_path: str):
                                     item_list[0], item_list[1], e
                                 )
                             )
-                            item_list.append('[UNK]')
+                            item_list.append("[UNK]")
                             x_list.append(float(single[30:38].strip()))
                             y_list.append(float(single[38:46].strip()))
                             z_list.append(float(single[46:54].strip()))
@@ -348,16 +348,17 @@ def extract_residue_avg(pdb_path: str):
                                     item_list[0], item_list[1], e
                                 )
                             )
-                            item_list.append('[UNK]')
+                            item_list.append("[UNK]")
                             x_list.append(float(single[30:38].strip()))
                             y_list.append(float(single[38:46].strip()))
                             z_list.append(float(single[46:54].strip()))
                             o_list.append(resi_order)
                 elif single[21] != current_chain:
                     # although exist same chain, save all chain of allosteric site (Unkown which chain is experment tested)
-                    # for pre in result_lists:
-                    #     if operator.eq(pre[2:], item_list[2:]):
-                    #         item_list = []
+                    if not save_repeat_chain:
+                        for pre in result_lists:
+                            if operator.eq(pre[2:], item_list[2:]):
+                                item_list = []
                     if len(x_list) > 0:
                         x_total = 0.0
                         y_total = 0.0
@@ -409,7 +410,7 @@ def extract_residue_avg(pdb_path: str):
                                     item_list[0], item_list[1], e
                                 )
                             )
-                            item_list.append('[UNK]')
+                            item_list.append("[UNK]")
                             x_list.append(float(single[30:38].strip()))
                             y_list.append(float(single[38:46].strip()))
                             z_list.append(float(single[46:54].strip()))
@@ -419,9 +420,10 @@ def extract_residue_avg(pdb_path: str):
                     else:
                         resi_order = ""
         # although exist same chain, save all chain of allosteric site (Unkown which chain is experment tested)
-        # for pre in result_lists:
-        #     if operator.eq(pre[2:], item_list[2:]):
-        #         item_list = []
+        if not save_repeat_chain:
+            for pre in result_lists:
+                if operator.eq(pre[2:], item_list[2:]):
+                    item_list = []
         if len(x_list) > 0:
             x_total = 0.0
             y_total = 0.0
@@ -454,16 +456,19 @@ def extract_residue_avg(pdb_path: str):
 
     return result_lists, position_lists, order_lists
 
-def build_allosteric_dataset(dir_path: str, outdir: str):
+
+def build_allosteric_dataset(dir_path: str, outdir: str, save_repeat_chhain: bool):
     filenames = os.listdir(dir_path)
     if not os.path.exists(outdir):
         os.mkdir(outdir)
 
     for file in tqdm(filenames):
-        if '.pdb' or '.ent' in file:
-            results, positions, orders = extract_residue_avg(dir_path+file)
+        if ".pdb" or ".ent" in file:
+            results, positions, orders = extract_residue_avg(
+                dir_path + file, save_repeat_chain=save_repeat_chhain
+            )
             dicts = []
-            with open(outdir+file[:-4]+'.json', 'w') as f:
+            with open(outdir + file[:-4] + ".json", "w") as f:
                 for i in range(len(results)):
                     # json.dump({
                     #     'pdbid': (results[i])[0],
@@ -473,15 +478,17 @@ def build_allosteric_dataset(dir_path: str, outdir: str):
                     #     'positions': positions[i]
                     # }, f, ensure_ascii=False, indent=4)
                     # f.write('\n')
-                    dicts.append({
-                        'pdbid': (results[i])[0],
-                        'chain': (results[i])[1],
-                        'residues': ' '.join((results[i])[2:]),
-                        'orders': ' '.join(orders[i]),
-                        'positions': positions[i]
-                    })
+                    dicts.append(
+                        {
+                            "pdbid": (results[i])[0],
+                            "chain": (results[i])[1],
+                            "residues": " ".join((results[i])[2:]),
+                            "orders": " ".join(orders[i]),
+                            "positions": positions[i],
+                        }
+                    )
                 json.dump(dicts, f, ensure_ascii=False, indent=4)
-                
+
 
 def extra_by_ncac(path: str, outpath: str):
     result_list = []
