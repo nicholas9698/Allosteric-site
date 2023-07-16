@@ -77,17 +77,33 @@ def pre_data(target_dir: str, pdb_dir: str, output_json: str):
         json.dump(data, f, ensure_ascii=False, indent=4)
 
 
-def pre_data_rcsb(rcsb_dir: str, output_json: str):
+def pre_data_rcsb(rcsb_dir: str, output_json: str, split: int = None):
     rcsb_jsons = os.listdir(rcsb_dir)
     data = []
-    for rcsb in tqdm(rcsb_jsons):
-        with open(rcsb_dir + rcsb, "r") as f:
-            ls = json.load(f)
-        for item in ls:
-            data.append(item)
+    order = 0
+    if split != None:
+        for rcsb in tqdm(rcsb_jsons):
+            with open(rcsb_dir + rcsb, "r") as f:
+                ls = json.load(f)
+            for item in ls:
+                data.append(item)
+            if len(data) == split:
+                with open(output_json[:-5] + "_" + str(order) + ".json", "w") as f:
+                    json.dump(data, f, ensure_ascii=False, indent=4)
+                    data = []
+                    order += 1
+        if len(data) > 0:
+            with open(output_json[:-5] + "_" + str(order) + ".json", "w") as f:
+                json.dump(data, f, ensure_ascii=False, indent=4)
+    else:
+        for rcsb in tqdm(rcsb_jsons):
+            with open(rcsb_dir + rcsb, "r") as f:
+                ls = json.load(f)
+            for item in ls:
+                data.append(item)
 
-    with open(output_json, "w") as f:
-        json.dump(data, f, ensure_ascii=False, indent=4)
+        with open(output_json, "w") as f:
+            json.dump(data, f, ensure_ascii=False, indent=4)
 
 
 def transform_data(data_path: str):
