@@ -87,11 +87,15 @@ def pre_data_rcsb(rcsb_dir: str, output_json: str, split: int = None):
                 ls = json.load(f)
             for item in ls:
                 data.append(item)
-            if len(data) == split:
+            if len(data) > split:
+                print("Writing to " + output_json[:-5] + "_" + str(order) + ".json")
+
                 with open(output_json[:-5] + "_" + str(order) + ".json", "w") as f:
                     json.dump(data, f, ensure_ascii=False, indent=4)
+                    del data
                     data = []
                     order += 1
+
         if len(data) > 0:
             with open(output_json[:-5] + "_" + str(order) + ".json", "w") as f:
                 json.dump(data, f, ensure_ascii=False, indent=4)
@@ -172,6 +176,65 @@ def transform_data(data_path: str):
         targets.append(target)
 
     return inputs, targets
+
+
+def transform_pretrain_data(data_dir: str, out_dir: str):
+    rcsb_jsons = os.listdir(data_dir)
+    for rcsb_json in rcsb_jsons:
+        with open(data_dir + rcsb_json, "r") as load_f:
+            data = json.load(load_f)
+        inputs = []
+        for item in tqdm(data):
+            residues = []
+            positions = []
+            orders = []
+            temp_resi = item["residues"].strip().split()
+            temp_orders = item["orders"].strip().split()
+            temp_positions = item["positions"]
+            current_order = int(temp_orders[0])
+            orders.append(str(current_order))
+            positions.append(temp_positions[0])
+            residues.append(temp_resi[0])
+
+            for i in range(1, len(temp_positions)):
+                now_order = int(temp_orders[i])
+                if current_order + 1 != now_order:
+                    for j in range(now_order - current_order - 1):
+                        residues.append("[UNK]")
+                        positions.append({"x": "0.0", "y": "0.0", "z": "0.0"})
+                        orders.append(str(current_order + j + 1))
+                residues.append(temp_resi[i])
+                positions.append(temp_positions[i])
+                orders.append(temp_orders[i])
+                current_order = now_order
+            if len(residues) > 1024:
+                continue
+            x_s = []
+            y_s = []
+            z_s = []
+            max_x = 0.0
+            max_y = 0.0
+            max_z = 0.0
+            for item in positions:
+                x_s.append(float(item["x"]))
+                y_s.append(float(item["y"]))
+                z_s.append(float(item["z"]))
+                if abs(x_s[-1] - 0) > max_x:
+                    max_x = abs(x_s[-1] - 0)
+                if abs(y_s[-1] - 0) > max_y:
+                    max_y = abs(y_s[-1] - 0)
+                if abs(z_s[-1] - 0) > max_z:
+                    max_z = abs(z_s[-1] - 0)
+            max_ls = [max_x, max_y, max_z]
+            max_delta = max(max_ls)
+            for pos in range(len(x_s)):
+                x_s[pos] = x_s[pos] / max_delta
+                y_s[pos] = y_s[pos] / max_delta
+                z_s[pos] = z_s[pos] / max_delta
+            input = {"sequence": residues, "x_s": x_s, "y_s": y_s, "z_s": z_s}
+            inputs.append(input)
+        with open(out_dir + rcsb_json, "w") as f:
+            json.dump(inputs, f, ensure_ascii=False)
 
 
 def split_train_test(inputs: list, targets: list, train_file: str, test_file: str):
