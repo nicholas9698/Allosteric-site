@@ -389,12 +389,8 @@ class ResidueRobertaForTokenClassification(RobertaForTokenClassification):
         loss = None
         
         if labels is not None:
-            new_labels = labels.new_zeros(labels.shape)
-            new_labels[:, :] = labels[:, :].clone()
-            new_labels.masked_fill_(new_labels == 0, -100)
-
             loss_fct = CrossEntropyLoss()
-            loss = loss_fct(logits.view(-1, self.num_labels), new_labels.view(-1))
+            loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
 
         if not return_dict:
             output = (logits,) + outputs[2:]

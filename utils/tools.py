@@ -25,14 +25,13 @@ def compute_adjustment(targets_loader: dict, tro: float, USE_CUDA: bool):
     for target in targets:
         for j in target:
             key = int(j.item())
-            if key != 0:
-                label_freq[key] = label_freq.get(key, 0) + 1
+            label_freq[key] = label_freq.get(key, 0) + 1
     label_freq = dict(sorted(label_freq.items()))
     label_freq_array = np.array(list(label_freq.values()))
     label_freq_array = label_freq_array / label_freq_array.sum()
     adjustments = np.log(label_freq_array ** tro + 1e-12)
     adjustments = torch.from_numpy(adjustments)
-    adjustments = torch.cat((torch.tensor([0], dtype=torch.float64), adjustments))
+
     if USE_CUDA:
         adjustments = adjustments.cuda()
     return adjustments
