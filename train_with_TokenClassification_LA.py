@@ -8,7 +8,6 @@ from torch.optim import AdamW
 from transformers import BertTokenizer, get_linear_schedule_with_warmup
 from utils.pre_data import (
     load_data_target,
-    prepare_train_batch,
     prepare_train_batch_adjust,
     inputs_to_list,
     pad_sequence_category,
