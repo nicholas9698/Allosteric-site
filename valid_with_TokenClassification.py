@@ -13,7 +13,7 @@ from models.ResidueRobertaModel import ResidueRobertaForTokenClassification
 
 USE_CUDA = torch.cuda.is_available()
 
-batch_size = 1
+batch_size = 2
 seed = 42
 test_file = "data/allosteric_site/data_test.json"
 
@@ -27,8 +27,8 @@ def set_seed(seed: int):
 
 set_seed(seed)
 
-model = ResidueRobertaForTokenClassification.from_pretrained("test")
-tokenizer = BertTokenizer.from_pretrained("test")
+model = ResidueRobertaForTokenClassification.from_pretrained("models/residue-roberta")
+tokenizer = BertTokenizer.from_pretrained("models/residue-roberta")
 
 # model size
 size = 0
@@ -66,11 +66,15 @@ for idx, item in enumerate(test_batches):
     test_output = get_labels(test_output['logits'])
 
     for i, target in enumerate(test_targets[idx]):
-        temp = test_output[i]
-        if temp == target:
+        try:
+            target_len = target.index(0)
+        except:
+            target_len = len(target)
+        temp = test_output[i][:target_len]
+        if temp == target[:target_len]:
             sequence_acc += 1
         sequence_total += 1
-        for l in range(len(target)):
+        for l in range(len(temp)):
             total += 1
             if target[l] == 2:
                 allosteric_total += 1
@@ -83,15 +87,17 @@ for idx, item in enumerate(test_batches):
                 elif temp[l] == 2:
                     fp += 1
 
-print("testing time", time_since(time.time() - start_time))
 print("All residue site", ac, total)
 print("Allosteric site", allosteric_ac, allosteric_total)
 print("residue_acc", float(ac) / total)
-precision = float(allosteric_ac) / (allosteric_ac + fp)
-print("residue_precision", precision)
+if allosteric_ac + fp != 0:
+    precision = float(allosteric_ac) / (allosteric_ac + fp)
+    print("residue_precision", precision)
 recall = float(allosteric_ac) / allosteric_total
 print("residue_recall", recall)
-print("residue_f1", (2 * precision * recall) / (precision + recall)) 
+if precision + recall != 0:
+    print("residue_f1", (2 * precision * recall) / (precision + recall)) 
 print("Sequence", sequence_acc, sequence_total)
 print("sequence_acc", float(sequence_acc) / float(sequence_total))
+print("testing time", time_since(time.time() - start_time))
 print("-" * 100)
