@@ -142,24 +142,24 @@ for epoch in range(n_epoch):
             test_output = get_labels(test_output['logits'])
 
             for i, target in enumerate(test_targets[idx]):
-                temp = test_output[i][:len(target)]
+                temp = test_output[i]
                 if temp == target:
                     sequence_acc += 1
                 sequence_total += 1
-                for l in range(len(temp)):
+                for l in range(len(target)):
                     total += 1
                     if target[l] == 2:
                         allosteric_total += 1
                         if temp[l] == target[l]:
                             allosteric_ac += 1
-                            ac +=1
+                            ac += 1
                     elif target[l] == 1:
-                        total += 1
                         if temp[l] == target[l]:
                             ac += 1
-                        else:
+                        elif temp[l] == 2:
                             fp += 1
 
+        print("testing time", time_since(time.time() - start_time))
         print("All residue site", ac, total)
         print("Allosteric site", allosteric_ac, allosteric_total)
         print("residue_acc", float(ac) / total)
@@ -170,7 +170,6 @@ for epoch in range(n_epoch):
         print("residue_f1", (2 * precision * recall) / (precision + recall)) 
         print("Sequence", sequence_acc, sequence_total)
         print("sequence_acc", float(sequence_acc) / float(sequence_total))
-        print("testing time", time_since(time.time() - start_time))
         print("-" * 100)
 
         if not os.path.exists(output_dir):

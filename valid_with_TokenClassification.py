@@ -1,16 +1,11 @@
-import os
-import sys
 import torch
 import time
 import random
-import operator
 import numpy as np
 from utils.tools import time_since, get_labels
-from torch.optim import AdamW
-from transformers import BertTokenizer, get_linear_schedule_with_warmup
+from transformers import BertTokenizer
 from utils.pre_data import (
     load_data_target,
-    prepare_train_batch,
     pad_sequence_category,
     prepare_test_batch,
 )
@@ -18,9 +13,8 @@ from models.ResidueRobertaModel import ResidueRobertaForTokenClassification
 
 USE_CUDA = torch.cuda.is_available()
 
-batch_size = 4
+batch_size = 1
 seed = 42
-train_file = "data/allosteric_site/data_train.json"
 test_file = "data/allosteric_site/data_test.json"
 
 
@@ -72,23 +66,24 @@ for idx, item in enumerate(test_batches):
     test_output = get_labels(test_output['logits'])
 
     for i, target in enumerate(test_targets[idx]):
-        temp = test_output[i][:len(target)]
+        temp = test_output[i]
         if temp == target:
             sequence_acc += 1
         sequence_total += 1
-        for l in range(len(temp)):
-            if temp[l] == target[l] and target[l] == 2:
-                allosteric_ac += 1
-                allosteric_total += 1
-                ac += 1
-            elif temp[l] == target[l]:
-                ac += 1
-            elif target[l] == 2:
-                allosteric_total += 1
-            elif target[l] != 2:
-                fp += 1
-
+        for l in range(len(target)):
             total += 1
+            if target[l] == 2:
+                allosteric_total += 1
+                if temp[l] == target[l]:
+                    allosteric_ac += 1
+                    ac += 1
+            elif target[l] == 1:
+                if temp[l] == target[l]:
+                    ac += 1
+                elif temp[l] == 2:
+                    fp += 1
+
+print("testing time", time_since(time.time() - start_time))
 print("All residue site", ac, total)
 print("Allosteric site", allosteric_ac, allosteric_total)
 print("residue_acc", float(ac) / total)
@@ -99,5 +94,4 @@ print("residue_recall", recall)
 print("residue_f1", (2 * precision * recall) / (precision + recall)) 
 print("Sequence", sequence_acc, sequence_total)
 print("sequence_acc", float(sequence_acc) / float(sequence_total))
-print("testing time", time_since(time.time() - start_time))
 print("-" * 100)

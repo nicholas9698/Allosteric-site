@@ -1,9 +1,7 @@
 import os
-import sys
 import torch
 import time
 import random
-import operator
 import numpy as np
 from utils.tools import time_since, get_labels
 from torch.optim import AdamW
@@ -39,9 +37,6 @@ set_seed(seed)
 
 model = ResidueRobertaForTokenClassification.from_pretrained("models/residue-roberta", num_labels=3)
 tokenizer = BertTokenizer.from_pretrained("models/residue-roberta")
-# new_tokens = ["0", "1"]
-# tokenizer.add_tokens(new_tokens)
-# model.resize_token_embeddings(len(tokenizer))
 
 # model size
 size = 0
@@ -92,9 +87,7 @@ for epoch in range(n_epoch):
         inputs = pad_sequence_category(
             data_batches[idx], target_batches[idx], tokenizer, USE_CUDA
         )
-        # for item in inputs['labels']:
-        #     print(item)
-        # sys.exit()
+
         loss = model(**inputs).loss
         loss.backward()
         loss_total += loss.item()
@@ -130,22 +123,24 @@ for epoch in range(n_epoch):
             test_output = get_labels(test_output['logits'])
 
             for i, target in enumerate(test_targets[idx]):
-                temp = test_output[i][:len(target)]
+                temp = test_output[i]
                 if temp == target:
                     sequence_acc += 1
                 sequence_total += 1
-                for l in range(len(temp)):
-                    if temp[l] == target[l] and target[l] == 2:
-                        allosteric_ac += 1
-                        allosteric_total += 1
-                        ac += 1
-                    elif temp[l] == target[l]:
-                        ac += 1
-                    elif target[l] == 2:
-                        allosteric_total += 1
-                    elif target[l] != 2:
-                        fp += 1
+                for l in range(len(target)):
                     total += 1
+                    if target[l] == 2:
+                        allosteric_total += 1
+                        if temp[l] == target[l]:
+                            allosteric_ac += 1
+                            ac += 1
+                    elif target[l] == 1:
+                        if temp[l] == target[l]:
+                            ac += 1
+                        elif temp[l] == 2:
+                            fp += 1
+
+        print("testing time", time_since(time.time() - start_time))
         print("All residue site", ac, total)
         print("Allosteric site", allosteric_ac, allosteric_total)
         print("residue_acc", float(ac) / total)
@@ -156,7 +151,6 @@ for epoch in range(n_epoch):
         print("residue_f1", (2 * precision * recall) / (precision + recall)) 
         print("Sequence", sequence_acc, sequence_total)
         print("sequence_acc", float(sequence_acc) / float(sequence_total))
-        print("testing time", time_since(time.time() - start_time))
         print("-" * 100)
 
         if not os.path.exists(output_dir):
