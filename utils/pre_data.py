@@ -8,6 +8,9 @@ from sklearn.model_selection import train_test_split
 from transformers import BertTokenizer
 
 
+'''
+    Functions of preparing dataset
+'''
 # 制作数据（仅提取变构位点json中的第一条链，原始pdb中的对应链）
 def pre_single_a(target_dir: str, pdb_dir: str, output_json: str):
     target_jsons = os.listdir(target_dir)
@@ -34,7 +37,6 @@ def pre_single_a(target_dir: str, pdb_dir: str, output_json: str):
                         break
     with open(output_json, "w") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
-
 
 # 处理所有的数据
 def pre_data(target_dir: str, pdb_dir: str, output_json: str):
@@ -76,7 +78,6 @@ def pre_data(target_dir: str, pdb_dir: str, output_json: str):
     with open(output_json, "w") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
 
-
 def pre_data_rcsb(rcsb_dir: str, output_json: str, split: int = None):
     rcsb_jsons = os.listdir(rcsb_dir)
     data = []
@@ -108,7 +109,6 @@ def pre_data_rcsb(rcsb_dir: str, output_json: str, split: int = None):
 
         with open(output_json, "w") as f:
             json.dump(data, f, ensure_ascii=False, indent=4)
-
 
 def transform_data(data_path: str):
     with open(data_path, "r") as load_f:
@@ -177,7 +177,6 @@ def transform_data(data_path: str):
 
     return inputs, targets
 
-
 def transform_pretrain_data(data_dir: str, out_dir: str):
     rcsb_jsons = os.listdir(data_dir)
     for rcsb_json in rcsb_jsons:
@@ -236,7 +235,6 @@ def transform_pretrain_data(data_dir: str, out_dir: str):
         with open(out_dir + rcsb_json, "w") as f:
             json.dump(inputs, f, ensure_ascii=False)
 
-
 def split_train_test(inputs: list, targets: list, train_file: str, test_file: str):
     data = []
     for i in range(len(inputs)):
@@ -248,7 +246,92 @@ def split_train_test(inputs: list, targets: list, train_file: str, test_file: st
     with open(test_file, "w") as f:
         json.dump(test_set, f, ensure_ascii=False)
 
+'''
+    Functions of the ResidueRobertaMLM pre-training
+'''
 
+# Load the pre-training data from file
+def load_data(train_file: str):
+    with open(train_file, "r") as f:
+        train_set = json.load(f)
+
+    train_pair = []
+
+    print("Processing data (Tips: Sequence with len(sequence)>1024 will be drop)...")
+    for item in tqdm(train_set):
+        input = item["sequence"]
+        if len(input) > 1024:
+            continue
+        x_s = item["x_s"]
+        y_s = item["y_s"]
+        z_s = item["z_s"]
+        positions = []
+        for i in range(len(x_s)):
+            positions.append([x_s[i], y_s[i], z_s[i]])
+
+        train_pair.append((input, positions))
+    return train_pair
+
+# Split training data by batch-size, and shuffle data in each epoch
+def prepare_train_batch_pretrain(data_train: list, batch_size: int):
+    train_pair = copy.deepcopy(data_train)
+    random.shuffle(train_pair)
+    batches = []
+    pos = 0
+
+    while pos + batch_size < len(train_pair):
+        batches.append(train_pair[pos : pos + batch_size])
+        pos += batch_size
+    batches.append(train_pair[pos:])
+
+    train_inputs = []
+    for batch in batches:
+        train_input = []
+        for item in batch:
+            train_input.append((item[0], item[1]))
+        train_inputs.append(train_input)
+
+    return train_inputs
+
+#  Pad the batch with tokenizer.pad_token_id to get the same length inputs.
+def pad_sequence_pretrain(input_ls: list, tokenizer: BertTokenizer, USE_CUDA: bool):
+    max_length = 0
+    xyz_positions = []
+    sequences = []
+    input_s = []
+    for item in input_ls:
+        sequences.append(item[0])
+        xyz_positions.append(item[1])
+        if max_length < len(item[0]):
+            max_length = len(item[0])
+    for i in range(len(xyz_positions)):
+        current_len = len(xyz_positions[i])
+        xyz_positions[i].extend(
+            [[0.0, 0.0, 0.0] for _ in range(max_length - current_len)]
+        )
+
+    input_s = tokenizer(sequences, return_tensors="pt", add_special_tokens=False, padding=True, is_split_into_words=True)
+    xyz_positions = torch.FloatTensor(xyz_positions)
+
+    if USE_CUDA:
+        inputs = {
+            "input_ids": input_s.input_ids.cuda(),
+            "xyz_position": xyz_positions.cuda(),
+            "attention_mask": input_s.attention_mask.cuda(),
+        }
+    else:
+        inputs = {
+            "input_ids": input_s.input_ids,
+            "xyz_position": xyz_positions,
+            "attention_mask": input_s.attention_mask,
+        }
+
+    return inputs
+
+
+'''
+    Functions of ResidueRoberta to achieve TokenClassification
+'''
 def load_data_target(train_file: str, tokenizer: BertTokenizer):
     with open(train_file, "r") as f:
         train_set = json.load(f)
@@ -270,7 +353,6 @@ def load_data_target(train_file: str, tokenizer: BertTokenizer):
         target = item["target"]
         train_pair.append((input, positions, target))
     return train_pair
-
 
 def prepare_train_batch(data_train: list, batch_size: int):
     train_pair = copy.deepcopy(data_train)
@@ -296,7 +378,6 @@ def prepare_train_batch(data_train: list, batch_size: int):
 
     return train_inputs, train_targets
 
-
 def prepare_train_data(data_train: list):
     train_inputs = []
     train_targets = []
@@ -305,7 +386,6 @@ def prepare_train_data(data_train: list):
         train_targets.append(item[2])
 
     return train_inputs, train_targets
-
 
 def prepare_train_batch_adjust(inputs: list, batch_size: int):
     train_pair = copy.deepcopy(inputs)
@@ -339,7 +419,6 @@ def prepare_train_batch_adjust(inputs: list, batch_size: int):
         )
     return final_inputs
 
-
 def prepare_test_batch(data_train: list, batch_size: int):
     train_pair = data_train
     batches = []
@@ -362,7 +441,6 @@ def prepare_test_batch(data_train: list, batch_size: int):
         train_targets.append(train_target)
 
     return train_inputs, train_targets
-
 
 def pad_sequence(
     input_ls: list, target_ls: list, tokenizer: BertTokenizer, USE_CUDA: bool
@@ -411,7 +489,6 @@ def pad_sequence(
 
     return inputs
 
-
 def pad_sequence_category(
     input_ls: list, target_ls: list, tokenizer: BertTokenizer, USE_CUDA: bool
 ):
@@ -459,7 +536,6 @@ def pad_sequence_category(
         }
 
     return inputs
-
 
 def inputs_to_list(inputs: dict):
     input_ids = inputs["input_ids"].tolist()
