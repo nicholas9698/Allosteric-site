@@ -52,6 +52,7 @@ train_pair = load_data_target(train_file, tokenizer)
 # prepare all trian labels to compute logits adjustment
 train_inputs, train_targets = prepare_train_data(train_pair)
 train_inputs = pad_sequence_category(train_inputs, train_targets, tokenizer, USE_CUDA=False)
+steps_per_epoch = math.ceil(float(train_inputs["input_ids"].shape[0]) / batch_size)
 
 test_pair = load_data_target(test_file, tokenizer)
 test_batches, test_targets = prepare_test_batch(test_pair, batch_size)
@@ -77,8 +78,8 @@ optimizer_ground_paramters = [
     },
 ]
 optimizer = AdamW(optimizer_ground_paramters, lr=learning_rate, eps=1e-8)
-scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=0.1*n_epoch*math.ceil(len(train_inputs)/batch_size), 
-                                            num_training_steps=n_epoch*math.ceil(len(train_inputs)/batch_size))
+scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=0.1*n_epoch*steps_per_epoch, 
+                                            num_training_steps=n_epoch*steps_per_epoch)
 
 model.zero_grad()
 
