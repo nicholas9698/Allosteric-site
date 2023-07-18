@@ -147,17 +147,19 @@ for epoch in range(n_epoch):
                     sequence_acc += 1
                 sequence_total += 1
                 for l in range(len(temp)):
-                    if temp[l] == target[l] and target[l] == 2:
-                        allosteric_ac += 1
-                        allosteric_total += 1
-                        ac += 1
-                    elif temp[l] == target[l]:
-                        ac += 1
-                    elif target[l] == 2:
-                        allosteric_total += 1
-                    elif target[l] != 2:
-                        fp += 1
                     total += 1
+                    if target[l] == 2:
+                        allosteric_total += 1
+                        if temp[l] == target[l]:
+                            allosteric_ac += 1
+                            ac +=1
+                    elif target[l] == 1:
+                        total += 1
+                        if temp[l] == target[l]:
+                            ac += 1
+                        else:
+                            fp += 1
+
         print("All residue site", ac, total)
         print("Allosteric site", allosteric_ac, allosteric_total)
         print("residue_acc", float(ac) / total)
