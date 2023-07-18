@@ -1,6 +1,7 @@
 import os
 import torch
 import time
+import math
 import random
 import numpy as np
 from utils.tools import time_since, get_labels, compute_adjustment
@@ -76,9 +77,8 @@ optimizer_ground_paramters = [
     },
 ]
 optimizer = AdamW(optimizer_ground_paramters, lr=learning_rate, eps=1e-8)
-scheduler = get_linear_schedule_with_warmup(
-    optimizer, num_warmup_steps=0.1 * n_epoch, num_training_steps=n_epoch
-)
+scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=0.1*n_epoch*math.ceil(len(train_inputs)/batch_size), 
+                                            num_training_steps=n_epoch*math.ceil(len(train_inputs)/batch_size))
 
 model.zero_grad()
 
@@ -90,7 +90,6 @@ for epoch in range(n_epoch):
     loss_total = 0
     print("epoch", epoch + 1)
     start_time = time.time()
-    # data_batches, target_batches = prepare_train_batch(train_pair, batch_size)
 
     # for logits adjustment
     data_batches = prepare_train_batch_adjust(train_inputs, batch_size)
@@ -98,9 +97,6 @@ for epoch in range(n_epoch):
     model.train()
 
     for idx in range(len(data_batches)):
-        # inputs = pad_sequence_category(
-        #     data_batches[idx], target_batches[idx], tokenizer, USE_CUDA
-        # )  
 
         if USE_CUDA:
             inputs = {"input_ids": data_batches[idx]['input_ids'].cuda(), "xyz_position": data_batches[idx]['xyz_position'].cuda(), 
@@ -116,13 +112,13 @@ for epoch in range(n_epoch):
         loss_total += loss.item()
 
         optimizer.step()
+        scheduler.step()
         model.zero_grad()
 
     print("loss:", loss_total / len(data_batches))
     print("training time", time_since(time.time() - start_time))
     print("--------------------------------")
-    scheduler.step()
-
+    
     if (epoch + 1) % 5 == 0 or n_epoch - epoch < 6:
         start_time = time.time()
         model.eval()
