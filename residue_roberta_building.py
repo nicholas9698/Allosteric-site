@@ -24,7 +24,7 @@ model = ResidueRobertaModel(configuration)
 if USE_CUDA:
     model.cuda()
 
-tokenizer = BertTokenizer.from_pretrained('models/tokenizer/residue')
+tokenizer = BertTokenizer.from_pretrained('models/tokenizer')
 
 if not os.path.exists('models/residue-roberta'):
     os.mkdir('models/residue-roberta')

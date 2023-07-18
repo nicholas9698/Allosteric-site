@@ -7,7 +7,6 @@ from tokenizers.pre_tokenizers import Whitespace
 from tokenizers.processors import TemplateProcessing
 from tokenizers.trainers import WordPieceTrainer
 
-# data_path = '../../data/tokenizer/'
 data_path = "/mnt/g/Little-LL/pretrain_tokenizer/"
 paths = []
 filenames = os.listdir(data_path)
