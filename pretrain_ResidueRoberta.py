@@ -21,7 +21,7 @@ learning_rate = 5e-5
 weight_decay = 1e-5
 n_epoch = 40
 seed = 42
-train_file_dir = ""
+train_file_dir = "data/pretrain_rcsb_inputs/"
 temp_dir = "models/pretraing/"
 output_dir = "models/residue-roberta"
 
@@ -33,9 +33,6 @@ if not os.path.exists(temp_dir):
 log_file = temp_dir+'pretraing-'+time.strftime("%Y-%m-%d_%H-%M", time.localtime())+'.log'
 with open(log_file, 'w') as f:
     f.write("Strat time: "+time.asctime()+'\n')
-
-with open(log_file, 'a') as f:
-    f.write('temp')
 
 def set_seed(seed: int):
     random.seed(seed)
@@ -94,6 +91,7 @@ for epoch in range(n_epoch):
     start_time = time.time()
 
     data_batches = prepare_train_batch_pretrain(train_pair, batch_size)
+    print("Finish prepare batches")
 
     model.train()
 
