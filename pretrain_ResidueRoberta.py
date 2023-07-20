@@ -117,8 +117,8 @@ for epoch in range(n_epoch):
     model.eval()
     model.save_pretrained(temp_dir)
     tokenizer.save_pretrained(temp_dir)
-    torch.save(optimizer, temp_dir+'optimizer.pt')
-    torch.save(scheduler, temp_dir+'scheduler.pt')
+    torch.save(optimizer.state_dict(), temp_dir+'optimizer.pt')
+    torch.save(scheduler.state_dict(), temp_dir+'scheduler.pt')
     with open(log_file, 'a') as f:
         f.write('-'*120+'\n')
         f.write("epoch: "+str(epoch+1)+'\n')
