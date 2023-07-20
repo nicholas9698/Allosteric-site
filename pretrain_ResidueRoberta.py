@@ -3,7 +3,7 @@ import torch
 import time
 import random
 import numpy as np
-from utils.tools import time_since, get_labels, mask_tokens
+from utils.tools import time_since, mask_tokens
 from torch.optim import AdamW
 from transformers import BertTokenizer, get_linear_schedule_with_warmup
 from utils.pre_data import (
@@ -98,9 +98,9 @@ for epoch in range(n_epoch):
     for idx in range(len(data_batches)):
         inputs = pad_sequence_pretrain(data_batches[idx], tokenizer, USE_CUDA) 
         inputs["input_ids"], labels = mask_tokens(inputs["input_ids"], tokenizer)
-            
-        loss = model(labels=labels, **inputs).loss
-        loss_total += loss.item()
+        inputs["labels"] = labels
+        loss = model(**inputs).loss
+        loss_total += (loss.item() / len(data_batches))
         loss = loss / accumulation_steps
         loss.backward()
         
@@ -108,7 +108,7 @@ for epoch in range(n_epoch):
             optimizer.step()
             model.zero_grad()
 
-    print("loss:", loss_total / len(data_batches))
+    print("loss:", loss_total)
     print("training time", time_since(time.time() - start_time))
     print("--------------------------------")
     scheduler.step()

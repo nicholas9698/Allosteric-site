@@ -62,13 +62,9 @@ def mask_tokens(inputs:torch.LongTensor=None, tokenizer:BertTokenizer=None, mlm_
         inputs[indices_replaced] = tokenizer.convert_tokens_to_ids(tokenizer.mask_token)
 
         # 10% of the time, we replace masked input tokens with random word
-        if str(inputs.device) == 'cpu':
-            indices_random = torch.bernoulli(torch.full(labels.shape, 0.5)).bool() & masked_indices & ~indices_replaced
-            random_words = torch.randint(min_residue_index, len(tokenizer), labels.shape, dtype=torch.long)
-        else:
-            indices_random = torch.bernoulli(torch.full(labels.shape, 0.5)).bool().cuda() & masked_indices.cuda() & ~indices_replaced.cuda()
-            random_words = torch.randint(min_residue_index, len(tokenizer), labels.shape, dtype=torch.long).cuda()
-
+        indices_random = torch.bernoulli(torch.full(labels.shape, 0.5)).bool() & masked_indices & ~indices_replaced
+        random_words = torch.randint(min_residue_index, len(tokenizer), labels.shape, dtype=torch.long, device=inputs.device)
+        
         inputs[indices_random] = random_words[indices_random]
 
         # The rest of the time (10% of the time) we keep the masked input tokens unchanged
