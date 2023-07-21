@@ -1,4 +1,5 @@
 import os
+import gc
 import sys
 import torch
 import time
@@ -133,8 +134,10 @@ for epoch in range(n_epoch-last_epoch-1):
     torch.save(optimizer.state_dict(), temp_dir+'optimizer.pt')
     with open(log_file, 'a') as f:
         f.write('-'*120+'\n')
-        f.write("epoch: "+str(epoch+1)+'\n')
+        f.write("epoch: "+str(epoch + last_epoch +2)+'\n')
         f.write("loss: "+str(loss_total)+'\n')
+    del data_batches
+    gc.collect()
 
 
 model.eval()

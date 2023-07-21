@@ -275,13 +275,14 @@ def load_data(train_file: str):
 # Split training data by batch-size, and shuffle data in each epoch
 def prepare_train_batch_pretrain(data_train: list, batch_size: int):
     random.shuffle(data_train)
+    train_pair = copy.deepcopy(data_train)
     batches = []
     pos = 0
 
-    while pos + batch_size < len(data_train):
-        batches.append(data_train[pos : pos + batch_size])
+    while pos + batch_size < len(train_pair):
+        batches.append(train_pair[pos : pos + batch_size])
         pos += batch_size
-    batches.append(data_train[pos:])
+    batches.append(train_pair[pos:])
 
     train_inputs = []
     for batch in batches:
