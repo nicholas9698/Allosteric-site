@@ -109,12 +109,12 @@ for epoch in range(n_epoch):
             
         loss = model(**inputs).loss
         loss.backward()
-        loss_total += loss.item()
+        loss_total += (loss.item() / len(data_batches))
 
         optimizer.step()
         model.zero_grad()
 
-    print("loss:", loss_total / len(data_batches))
+    print("loss:", loss_total)
     print("training time", time_since(time.time() - start_time))
     print("--------------------------------")
     scheduler.step()

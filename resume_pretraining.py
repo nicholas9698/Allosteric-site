@@ -1,8 +1,10 @@
 import os
+import sys
 import torch
 import time
 import random
 import numpy as np
+from tqdm import tqdm
 from utils.tools import time_since, mask_tokens
 from torch.optim import AdamW
 from transformers import BertTokenizer, get_linear_schedule_with_warmup
@@ -24,15 +26,22 @@ seed = 42
 train_file_dir = "data/pretrain_rcsb_inputs/"
 temp_dir = "models/pretraing/"
 output_dir = "models/residue-roberta"
+log_file = temp_dir+''
+last_epoch = -1
 
+with open(log_file, 'r') as f:
+    for line in f.readlines():
+        item_ls = line.strip().split()
+        if item_ls[0] == 'epoch:':
+            try:
+                last_epoch = int(item_ls[1]) - 1
+            except Exception as e:
+                print(e)
+                print("There is an error in logfile.")
+                sys.exit()
 
-if not os.path.exists(output_dir):
-    os.makedirs(output_dir)
-if not os.path.exists(temp_dir):
-    os.makedirs(temp_dir)
-log_file = temp_dir+'pretraing-'+time.strftime("%Y-%m-%d_%H-%M", time.localtime())+'.log'
-with open(log_file, 'w') as f:
-    f.write("Strat time: "+time.asctime()+'\n')
+with open(log_file, 'a') as f:
+    f.write("Resume time: "+time.asctime()+'\n')
 
 def set_seed(seed: int):
     random.seed(seed)
@@ -42,8 +51,8 @@ def set_seed(seed: int):
 
 set_seed(seed)
 
-model = ResidueRobertaForMaskedLM.from_pretrained("models/residue-roberta")
-tokenizer = BertTokenizer.from_pretrained("models/residue-roberta")
+model = ResidueRobertaForMaskedLM.from_pretrained(temp_dir)
+tokenizer = BertTokenizer.from_pretrained(temp_dir)
 
 # model size
 size = 0
@@ -56,7 +65,6 @@ train_pair = []
 for item in train_file_list:
     temp = load_data(train_file_dir+item)
     train_pair.extend(temp)
-
 
 if USE_CUDA:
     model.cuda()
@@ -79,15 +87,20 @@ optimizer_ground_paramters = [
     },
 ]
 optimizer = AdamW(optimizer_ground_paramters, lr=learning_rate, eps=1e-8)
-scheduler = get_linear_schedule_with_warmup(
-    optimizer, num_warmup_steps=0.1 * n_epoch, num_training_steps=n_epoch
-)
+optimizer.load_state_dict(torch.load(temp_dir+'optimizer.pt'))
+scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=0.1 * n_epoch, num_training_steps=n_epoch, last_epoch=last_epoch)
 
 model.zero_grad()
 
-for epoch in range(n_epoch):
+print('Reshuffle data to resume pretraining ...')
+for i in tqdm(range(last_epoch + 1)):
+    random.shuffle(train_pair)
+print('-'*120)
+
+print('Start pretraining ...')
+for epoch in range(n_epoch-last_epoch-1):
     loss_total = 0
-    print("epoch", epoch + 1)
+    print("epoch", epoch + last_epoch +2)
     start_time = time.time()
 
     data_batches = prepare_train_batch_pretrain(train_pair, batch_size)
