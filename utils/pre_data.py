@@ -31,7 +31,13 @@ def load_data_target(train_file: str, pocket_classification: bool = False):
                 positions.append([x_s[i], y_s[i], z_s[i]])
 
             target = item["target"]
-            train_pair.append((input, positions, target))
+            
+            if "orthosite" in item["input"].keys():
+                orthosite = item["input"]["orthosite"]
+                train_pair.append((input, positions, target, orthosite))
+            else:
+                 train_pair.append((input, positions, target))
+           
         return train_pair
     else:
         with open(train_file, "r") as f:
@@ -52,7 +58,13 @@ def load_data_target(train_file: str, pocket_classification: bool = False):
                 positions.append([x_s[i], y_s[i], z_s[i]])
 
             target = item["target"]
-            train_pair.append((input, positions, target))
+
+            if "orthosite" in item["input"].keys():
+                orthosite = item["input"]["orthosite"]
+                train_pair.append((input, positions, target, orthosite))
+            else:
+                 train_pair.append((input, positions, target))
+
         return train_pair
     
 def prepare_test_batch(data_train: list, batch_size: int):
@@ -67,14 +79,26 @@ def prepare_test_batch(data_train: list, batch_size: int):
 
     train_inputs = []
     train_targets = []
-    for batch in batches:
-        train_input = []
-        train_target = []
-        for item in batch:
-            train_input.append((item[0], item[1]))
-            train_target.append(item[2])
-        train_inputs.append(train_input)
-        train_targets.append(train_target)
+    
+    count_input = len(batches[0][0])
+    if count_input == 4:
+        for batch in batches:
+            train_input = []
+            train_target = []
+            for item in batch:
+                train_input.append((item[0], item[1], item[3]))
+                train_target.append(item[2])
+            train_inputs.append(train_input)
+            train_targets.append(train_target)
+    elif count_input == 3:
+        for batch in batches:
+            train_input = []
+            train_target = []
+            for item in batch:
+                train_input.append((item[0], item[1]))
+                train_target.append(item[2])
+            train_inputs.append(train_input)
+            train_targets.append(train_target)
 
     return train_inputs, train_targets
 
@@ -91,14 +115,26 @@ def prepare_train_batch(data_train: list, batch_size: int):
 
     train_inputs = []
     train_targets = []
-    for batch in batches:
-        train_input = []
-        train_target = []
-        for item in batch:
-            train_input.append((item[0], item[1]))
-            train_target.append(item[2])
-        train_inputs.append(train_input)
-        train_targets.append(train_target)
+    
+    count_input = len(batches[0][0])
+    if count_input == 4:
+        for batch in batches:
+            train_input = []
+            train_target = []
+            for item in batch:
+                train_input.append((item[0], item[1], item[3]))
+                train_target.append(item[2])
+            train_inputs.append(train_input)
+            train_targets.append(train_target)
+    elif count_input == 3:
+        for batch in batches:
+            train_input = []
+            train_target = []
+            for item in batch:
+                train_input.append((item[0], item[1]))
+                train_target.append(item[2])
+            train_inputs.append(train_input)
+            train_targets.append(train_target)        
 
     return train_inputs, train_targets
 
@@ -197,43 +233,92 @@ def pad_sequence_category(
     sequences = []
     target_s = []
     input_s = []
-    for item in input_ls:
-        sequences.append(item[0])
-        xyz_positions.append(item[1])
-        if max_length < len(item[0]):
-            max_length = len(item[0])
-    for i in range(len(xyz_positions)):
-        current_len = len(xyz_positions[i])
-        xyz_positions[i].extend(
-            [[0.0, 0.0, 0.0] for _ in range(max_length - current_len)]
+    orthosite_s = []
+
+    count_input = len(input_ls[0])
+    if count_input == 2:
+        for item in input_ls:
+            sequences.append(item[0])
+            xyz_positions.append(item[1])
+
+            if max_length < len(item[0]):
+                max_length = len(item[0])
+        for i in range(len(xyz_positions)):
+            current_len = len(xyz_positions[i])
+            xyz_positions[i].extend(
+                [[0.0, 0.0, 0.0] for _ in range(max_length - current_len)]
+            )
+            target_ls[i].extend([0 for _ in range(max_length - current_len)])
+            target_s.append(target_ls[i])
+        
+        input_s = tokenizer(
+            sequences,
+            return_tensors="pt",
+            add_special_tokens=False,
+            padding=True,
+            is_split_into_words=True,
         )
-        target_ls[i].extend([0 for _ in range(max_length - current_len)])
-        target_s.append(target_ls[i])
+        target_s = torch.LongTensor(target_s)
+        xyz_positions = torch.FloatTensor(xyz_positions)
 
-    input_s = tokenizer(
-        sequences,
-        return_tensors="pt",
-        add_special_tokens=False,
-        padding=True,
-        is_split_into_words=True,
-    )
-    target_s = torch.LongTensor(target_s)
-    xyz_positions = torch.FloatTensor(xyz_positions)
+        if USE_CUDA:
+            inputs = {
+                "input_ids": input_s.input_ids.cuda(),
+                "xyz_position": xyz_positions.cuda(),
+                "attention_mask": input_s.attention_mask.cuda(),
+                "labels": target_s.cuda(),
+            }
+        else:
+            inputs = {
+                "input_ids": input_s.input_ids,
+                "xyz_position": xyz_positions,
+                "attention_mask": input_s.attention_mask,
+                "labels": target_s,
+            }
+    elif count_input == 3:
+        for item in input_ls:
+            sequences.append(item[0])
+            xyz_positions.append(item[1])
+            orthosite_s.append(item[2])
+            
+            if max_length < len(item[0]):
+                max_length = len(item[0])
+        for i in range(len(xyz_positions)):
+            current_len = len(xyz_positions[i])
+            xyz_positions[i].extend(
+                [[0.0, 0.0, 0.0] for _ in range(max_length - current_len)]
+            )
+            orthosite_s[i].extend([0 for _ in range(max_length - current_len)])
+            target_ls[i].extend([0 for _ in range(max_length - current_len)])
+            target_s.append(target_ls[i]) 
 
-    if USE_CUDA:
-        inputs = {
-            "input_ids": input_s.input_ids.cuda(),
-            "xyz_position": xyz_positions.cuda(),
-            "attention_mask": input_s.attention_mask.cuda(),
-            "labels": target_s.cuda(),
-        }
-    else:
-        inputs = {
-            "input_ids": input_s.input_ids,
-            "xyz_position": xyz_positions,
-            "attention_mask": input_s.attention_mask,
-            "labels": target_s,
-        }
+        input_s = tokenizer(
+            sequences,
+            return_tensors="pt",
+            add_special_tokens=False,
+            padding=True,
+            is_split_into_words=True,
+        )
+        target_s = torch.LongTensor(target_s)
+        orthosite_s = torch.LongTensor(orthosite_s)
+        xyz_positions = torch.FloatTensor(xyz_positions)
+
+        if USE_CUDA:
+            inputs = {
+                "input_ids": input_s.input_ids.cuda(),
+                "xyz_position": xyz_positions.cuda(),
+                "attention_mask": input_s.attention_mask.cuda(),
+                "orthosteric_position": orthosite_s.cuda(),
+                "labels": target_s.cuda(),
+            }
+        else:
+            inputs = {
+                "input_ids": input_s.input_ids,
+                "xyz_position": xyz_positions,
+                "attention_mask": input_s.attention_mask,
+                "orthosteric_position": orthosite_s,
+                "labels": target_s,
+            }
 
     return inputs
 
