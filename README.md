@@ -12,7 +12,7 @@ This is the offcial repo for the xxx paper "[xxx](https://google.com)".
 python -u pretrain_ResidueRoberta.py
 ```
 
-When an error occurs, the `resume_pretraining.py` can be executed to continue pre-training.
+When an error occurs, the `resume_pretraining.py` can be executed to continue the pre-training.
 ```
 python -u pretrain_ResidueRoberta.py
 ```
