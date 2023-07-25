@@ -3,7 +3,7 @@ This is the offcial repo for the xxx paper "[xxx](https://google.com)".
 
 ## Pre-training
 
-1. Follow the instructions `Data downloading` in `data_processing.ipynb` to download the pre-training pdb corpus from [rcsb.org](https://www.rcsb.org/).
+1. Follow the instruction `Data downloading` in `data_processing.ipynb` to download the pre-training pdb corpus from [rcsb.org](https://www.rcsb.org/).
    
 2. Execute the `Build the dataset for pretrain ResidueRobertaMLM` in `data_processing.ipynb` to process the pdb file and build the pre-training data.
 
