@@ -9,10 +9,10 @@ from transformers import BertTokenizer, get_linear_schedule_with_warmup
 from utils.pre_data import (
     load_data_target,
     prepare_train_batch,
-    pad_sequence_category,
+    pad_sequence_seq,
     prepare_test_batch,
 )
-from models.ResidueRobertaModel import ResidueRobertaForTokenClassification
+from models.ResidueRobertaModel import ResidueRobertaForSequenceClassification
 
 USE_CUDA = torch.cuda.is_available()
 
@@ -35,7 +35,7 @@ def set_seed(seed: int):
 
 set_seed(seed)
 
-model = ResidueRobertaForTokenClassification.from_pretrained("models/residue-roberta", num_labels=3)
+model = ResidueRobertaForSequenceClassification.from_pretrained("models/residue-roberta", num_labels=2)
 tokenizer = BertTokenizer.from_pretrained("models/residue-roberta")
 
 # model size
@@ -84,7 +84,7 @@ for epoch in range(n_epoch):
     
     model.train()
     for idx in range(len(data_batches)):
-        inputs = pad_sequence_category(
+        inputs = pad_sequence_seq(
             data_batches[idx], target_batches[idx], tokenizer, USE_CUDA
         )
 
@@ -103,8 +103,6 @@ for epoch in range(n_epoch):
     if (epoch + 1) % 5 == 0 or n_epoch - epoch < 6:
         start_time = time.time()
         model.eval()
-        sequence_acc = 0
-        sequence_total = 0
         allosteric_total = 0
         allosteric_ac = 0
         fp = 0
@@ -112,7 +110,7 @@ for epoch in range(n_epoch):
         total = 0
 
         for idx, item in enumerate(test_batches):
-            test_batch = pad_sequence_category(item, test_targets[idx], tokenizer, USE_CUDA)
+            test_batch = pad_sequence_seq(item, test_targets[idx], tokenizer, USE_CUDA)
             test_output = model(
                 input_ids=test_batch["input_ids"],
                 xyz_position=test_batch["xyz_position"],
@@ -120,42 +118,31 @@ for epoch in range(n_epoch):
                 labels=None,
                 adjustment=None
             )
-            test_output = get_labels(test_output['logits'])
+            test_output = get_labels(test_output['logits'], pocket_classification=True)
 
             for i, target in enumerate(test_targets[idx]):
-                try:
-                    target_len = target.index(0)
-                except:
-                    target_len = len(target)
-                temp = test_output[i][:target_len]
-                if temp == target[:target_len]:
-                    sequence_acc += 1
-                sequence_total += 1
-                for l in range(len(temp)):
-                    total += 1
-                    if target[l] == 2:
-                        allosteric_total += 1
-                        if temp[l] == target[l]:
-                            allosteric_ac += 1
-                            ac += 1
-                    elif target[l] == 1:
-                        if temp[l] == target[l]:
-                            ac += 1
-                        elif temp[l] == 2:
-                            fp += 1
+                total += 1
+                if target == 1:
+                    allosteric_total += 1
+                    if target == test_output[i]:
+                        allosteric_ac += 1
+                        ac += 1
+                elif target == 0:
+                    if target == test_output[i]:
+                        ac += 1
+                    else:
+                        fp += 1
 
-        print("All residue site", ac, total)
-        print("Allosteric site", allosteric_ac, allosteric_total)
-        print("residue_acc", float(ac) / total)
+        print("All residue pocket", ac, total)
+        print("Allosteric pocket", allosteric_ac, allosteric_total)
+        print("pocket_acc", float(ac) / total)
         if allosteric_ac + fp != 0:
             precision = float(allosteric_ac) / (allosteric_ac + fp)
-            print("residue_precision", precision)
+            print("pocket_precision", precision)
         recall = float(allosteric_ac) / allosteric_total
-        print("residue_recall", recall)
+        print("pocket_recall", recall)
         if precision + recall != 0:
-            print("residue_f1", (2 * precision * recall) / (precision + recall)) 
-        print("Sequence", sequence_acc, sequence_total)
-        print("sequence_acc", float(sequence_acc) / float(sequence_total))
+            print("pocket_f1", (2 * precision * recall) / (precision + recall)) 
         print("testing time", time_since(time.time() - start_time))
         print("-" * 100)
 

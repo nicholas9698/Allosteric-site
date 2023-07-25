@@ -12,9 +12,13 @@ def time_since(s):
     return '%dh %dm %ds' % (h, m, s)
 
 # transform prob to label
-def get_labels(probs: torch.Tensor):
-    results = torch.max(probs, 2) 
-    return results[1].tolist()
+def get_labels(probs: torch.Tensor, pocket_classification: bool = False):
+    if pocket_classification:
+        results = torch.max(probs, dim=1)
+        return results[1].tolist()
+    else:
+        results = torch.max(probs, dim=2) 
+        return results[1].tolist()
 
 # logits adjustment
 def compute_adjustment(targets_loader: dict, tro: float, USE_CUDA: bool):

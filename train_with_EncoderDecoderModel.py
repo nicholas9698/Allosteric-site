@@ -60,8 +60,8 @@ for n, p in model.named_parameters():
     size += p.nelement()
 print("Total parameters: {}".format(size))
 
-train_pair = load_data_target(train_file, tokenizer)
-test_pair = load_data_target(test_file, tokenizer)
+train_pair = load_data_target(train_file)
+test_pair = load_data_target(test_file)
 test_batches, test_targets = prepare_test_batch(test_pair, batch_size)
 
 if USE_CUDA:

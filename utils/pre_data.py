@@ -7,9 +7,395 @@ from tqdm import tqdm
 from sklearn.model_selection import train_test_split
 from transformers import BertTokenizer
 
+'''
+    Universal function
+'''
+def load_data_target(train_file: str, pocket_classification: bool = False):
+    if pocket_classification:
+        with open(train_file, "r") as f:
+            train_set = json.load(f)
+
+        train_pair = []
+
+        print("Processing data...")
+        for item in tqdm(train_set):
+            input = item["input"]["sequence"]
+            # The [CLS] and [EOS] are added for sequence classification
+            if len(input) > (1024-2):
+                continue
+            x_s = item["input"]["x_s"]
+            y_s = item["input"]["y_s"]
+            z_s = item["input"]["z_s"]
+            positions = []
+            for i in range(len(x_s)):
+                positions.append([x_s[i], y_s[i], z_s[i]])
+
+            target = item["target"]
+            train_pair.append((input, positions, target))
+        return train_pair
+    else:
+        with open(train_file, "r") as f:
+            train_set = json.load(f)
+
+        train_pair = []
+
+        print("Processing data...")
+        for item in tqdm(train_set):
+            input = item["input"]["sequence"]
+            if len(input) > (1024-2):
+                continue
+            x_s = item["input"]["x_s"]
+            y_s = item["input"]["y_s"]
+            z_s = item["input"]["z_s"]
+            positions = []
+            for i in range(len(x_s)):
+                positions.append([x_s[i], y_s[i], z_s[i]])
+
+            target = item["target"]
+            train_pair.append((input, positions, target))
+        return train_pair
+    
+def prepare_test_batch(data_train: list, batch_size: int):
+    train_pair = data_train
+    batches = []
+    pos = 0
+
+    while pos + batch_size < len(train_pair):
+        batches.append(train_pair[pos : pos + batch_size])
+        pos += batch_size
+    batches.append(train_pair[pos:])
+
+    train_inputs = []
+    train_targets = []
+    for batch in batches:
+        train_input = []
+        train_target = []
+        for item in batch:
+            train_input.append((item[0], item[1]))
+            train_target.append(item[2])
+        train_inputs.append(train_input)
+        train_targets.append(train_target)
+
+    return train_inputs, train_targets
+
+def prepare_train_batch(data_train: list, batch_size: int):
+    train_pair = copy.deepcopy(data_train)
+    random.shuffle(train_pair)
+    batches = []
+    pos = 0
+
+    while pos + batch_size < len(train_pair):
+        batches.append(train_pair[pos : pos + batch_size])
+        pos += batch_size
+    batches.append(train_pair[pos:])
+
+    train_inputs = []
+    train_targets = []
+    for batch in batches:
+        train_input = []
+        train_target = []
+        for item in batch:
+            train_input.append((item[0], item[1]))
+            train_target.append(item[2])
+        train_inputs.append(train_input)
+        train_targets.append(train_target)
+
+    return train_inputs, train_targets
+
 
 '''
-    Functions of preparing dataset
+    Functions of the ResidueRobertaMLM pre-training
+'''
+
+# Load the pre-training data from file
+def load_data(train_file: str):
+    with open(train_file, "r") as f:
+        train_set = json.load(f)
+
+    train_pair = []
+
+    print("Processing data (Tips: Sequence with len(sequence)>1024 will be drop)...")
+    for item in tqdm(train_set):
+        input = item["sequence"]
+        if len(input) > 1024:
+            continue
+        x_s = item["x_s"]
+        y_s = item["y_s"]
+        z_s = item["z_s"]
+        positions = []
+        for i in range(len(x_s)):
+            positions.append([x_s[i], y_s[i], z_s[i]])
+
+        train_pair.append((input, positions))
+    return train_pair
+
+# Split training data by batch-size, and shuffle data in each epoch
+def prepare_train_batch_pretrain(data_train: list, batch_size: int):
+    random.shuffle(data_train)
+    train_pair = copy.deepcopy(data_train)
+    batches = []
+    pos = 0
+
+    while pos + batch_size < len(train_pair):
+        batches.append(train_pair[pos : pos + batch_size])
+        pos += batch_size
+    batches.append(train_pair[pos:])
+
+    train_inputs = []
+    for batch in batches:
+        train_input = []
+        for item in batch:
+            train_input.append((item[0], item[1]))
+        train_inputs.append(train_input)
+
+    return train_inputs
+
+#  Pad the batch with tokenizer.pad_token_id to get the same length inputs.
+def pad_sequence_pretrain(input_ls: list, tokenizer: BertTokenizer, USE_CUDA: bool):
+    max_length = 0
+    xyz_positions = []
+    sequences = []
+    input_s = []
+    for item in input_ls:
+        sequences.append(item[0])
+        xyz_positions.append(item[1])
+        if max_length < len(item[0]):
+            max_length = len(item[0])
+    for i in range(len(xyz_positions)):
+        current_len = len(xyz_positions[i])
+        xyz_positions[i].extend(
+            [[0.0, 0.0, 0.0] for _ in range(max_length - current_len)]
+        )
+
+    input_s = tokenizer(sequences, return_tensors="pt", add_special_tokens=False, padding=True, is_split_into_words=True)
+    xyz_positions = torch.FloatTensor(xyz_positions)
+
+    if USE_CUDA:
+        inputs = {
+            "input_ids": input_s.input_ids.cuda(),
+            "xyz_position": xyz_positions.cuda(),
+            "attention_mask": input_s.attention_mask.cuda(),
+        }
+    else:
+        inputs = {
+            "input_ids": input_s.input_ids,
+            "xyz_position": xyz_positions,
+            "attention_mask": input_s.attention_mask,
+        }
+
+    return inputs
+
+
+'''
+    Functions of ResidueRoberta to achieve TokenClassification
+'''
+def pad_sequence_category(
+    input_ls: list, target_ls: list, tokenizer: BertTokenizer, USE_CUDA: bool
+):
+    max_length = 0
+    xyz_positions = []
+    sequences = []
+    target_s = []
+    input_s = []
+    for item in input_ls:
+        sequences.append(item[0])
+        xyz_positions.append(item[1])
+        if max_length < len(item[0]):
+            max_length = len(item[0])
+    for i in range(len(xyz_positions)):
+        current_len = len(xyz_positions[i])
+        xyz_positions[i].extend(
+            [[0.0, 0.0, 0.0] for _ in range(max_length - current_len)]
+        )
+        target_ls[i].extend([0 for _ in range(max_length - current_len)])
+        target_s.append(target_ls[i])
+
+    input_s = tokenizer(
+        sequences,
+        return_tensors="pt",
+        add_special_tokens=False,
+        padding=True,
+        is_split_into_words=True,
+    )
+    target_s = torch.LongTensor(target_s)
+    xyz_positions = torch.FloatTensor(xyz_positions)
+
+    if USE_CUDA:
+        inputs = {
+            "input_ids": input_s.input_ids.cuda(),
+            "xyz_position": xyz_positions.cuda(),
+            "attention_mask": input_s.attention_mask.cuda(),
+            "labels": target_s.cuda(),
+        }
+    else:
+        inputs = {
+            "input_ids": input_s.input_ids,
+            "xyz_position": xyz_positions,
+            "attention_mask": input_s.attention_mask,
+            "labels": target_s,
+        }
+
+    return inputs
+
+# Apply logits adjustment to balance Indicates the influence of unbalanced labels
+def prepare_train_data(data_train: list):
+    train_inputs = []
+    train_targets = []
+    for item in data_train:
+        train_inputs.append((item[0], item[1]))
+        train_targets.append(item[2])
+
+    return train_inputs, train_targets
+
+def prepare_train_batch_adjust(inputs: list, batch_size: int):
+    train_pair = copy.deepcopy(inputs)
+    random.shuffle(train_pair)
+    batches = []
+    pos = 0
+
+    while pos + batch_size < len(train_pair):
+        batches.append(train_pair[pos : pos + batch_size])
+        pos += batch_size
+    batches.append(train_pair[pos:])
+
+    final_inputs = []
+    for batch in batches:
+        input_ids = []
+        xyz_position = []
+        attention_mask = []
+        labels = []
+        for item in batch:
+            input_ids.append(item[0])
+            xyz_position.append(item[1])
+            attention_mask.append(item[2])
+            labels.append(item[3])
+        final_inputs.append(
+            {
+                "input_ids": torch.LongTensor(input_ids),
+                "xyz_position": torch.FloatTensor(xyz_position),
+                "attention_mask": torch.FloatTensor(attention_mask),
+                "labels": torch.LongTensor(labels),
+            }
+        )
+    return final_inputs
+
+def inputs_to_list(inputs: dict):
+    input_ids = inputs["input_ids"].tolist()
+    xyz_position = inputs["xyz_position"].tolist()
+    attention_mask = inputs["attention_mask"].tolist()
+    labels = inputs["labels"].tolist()
+
+    total_inputs = []
+    for i in range(len(input_ids)):
+        total_inputs.append(
+            (input_ids[i], xyz_position[i], attention_mask[i], labels[i])
+        )
+
+    return total_inputs
+
+
+'''
+    Function for SequenceClassification
+'''
+def pad_sequence_seq(input_ls: list, target_ls: list, tokenizer: BertTokenizer, USE_CUDA: bool):
+    max_length = 0
+    xyz_positions = []
+    sequences = []
+    target_s = []
+    input_s = []
+    for item in input_ls:
+        sequences.append(item[0])
+        xyz_positions.append(item[1])
+        if max_length < len(item[0]):
+            max_length = len(item[0])
+    for i in range(len(xyz_positions)):
+        xyz_positions.insert(0, [0.0, 0.0, 0.0])
+        xyz_positions.append([0.0, 0.0, 0.0])
+        current_len = len(xyz_positions[i])
+        xyz_positions[i].extend(
+            [[0.0, 0.0, 0.0] for _ in range(max_length - current_len)]
+        )
+
+    input_s = tokenizer(
+        sequences,
+        return_tensors="pt",
+        padding=True,
+        is_split_into_words=True,
+    )
+    target_s = torch.LongTensor(target_ls)
+    xyz_positions = torch.FloatTensor(xyz_positions)
+
+    if USE_CUDA:
+        inputs = {
+            "input_ids": input_s.input_ids.cuda(),
+            "xyz_position": xyz_positions.cuda(),
+            "attention_mask": input_s.attention_mask.cuda(),
+            "labels": target_s.cuda(),
+        }
+    else:
+        inputs = {
+            "input_ids": input_s.input_ids,
+            "xyz_position": xyz_positions,
+            "attention_mask": input_s.attention_mask,
+            "labels": target_s,
+        }
+
+    return inputs
+
+
+'''
+    Functions for EncoderDecoderModel to generate sequence-structured predictions
+'''
+def pad_sequence(
+    input_ls: list, target_ls: list, tokenizer: BertTokenizer, USE_CUDA: bool
+):
+    max_length = 0
+    xyz_positions = []
+    sequences = []
+    for item in input_ls:
+        sequences.append(item[0])
+        xyz_positions.append(item[1])
+        if max_length < len(item[0]):
+            max_length = len(item[0])
+    for i in range(len(xyz_positions)):
+        while len(xyz_positions[i]) < max_length:
+            xyz_positions[i].append([0.0, 0.0, 0.0])
+
+    input_ls = tokenizer(
+        sequences,
+        return_tensors="pt",
+        add_special_tokens=False,
+        padding=True,
+        is_split_into_words=True,
+    )
+    target_ls = tokenizer(
+        target_ls,
+        return_tensors="pt",
+        add_special_tokens=False,
+        padding=True,
+        is_split_into_words=True,
+    )
+    xyz_positions = torch.Tensor(xyz_positions)
+    if USE_CUDA:
+        inputs = {
+            "input_ids": input_ls.input_ids.cuda(),
+            "xyz_position": xyz_positions.cuda(),
+            "attention_mask": input_ls.attention_mask.cuda(),
+            "labels": target_ls.input_ids.cuda(),
+        }
+    else:
+        inputs = {
+            "input_ids": input_ls.input_ids,
+            "xyz_position": xyz_positions,
+            "attention_mask": input_ls.attention_mask,
+            "labels": target_ls.input_ids,
+        }
+
+    return inputs
+
+
+'''
+    Functions for preparing dataset
 '''
 # 制作数据（仅提取变构位点json中的第一条链，原始pdb中的对应链）
 def pre_single_a(target_dir: str, pdb_dir: str, output_json: str):
@@ -245,308 +631,3 @@ def split_train_test(inputs: list, targets: list, train_file: str, test_file: st
         json.dump(train_set, f, ensure_ascii=False)
     with open(test_file, "w") as f:
         json.dump(test_set, f, ensure_ascii=False)
-
-'''
-    Functions of the ResidueRobertaMLM pre-training
-'''
-
-# Load the pre-training data from file
-def load_data(train_file: str):
-    with open(train_file, "r") as f:
-        train_set = json.load(f)
-
-    train_pair = []
-
-    print("Processing data (Tips: Sequence with len(sequence)>1024 will be drop)...")
-    for item in tqdm(train_set):
-        input = item["sequence"]
-        if len(input) > 1024:
-            continue
-        x_s = item["x_s"]
-        y_s = item["y_s"]
-        z_s = item["z_s"]
-        positions = []
-        for i in range(len(x_s)):
-            positions.append([x_s[i], y_s[i], z_s[i]])
-
-        train_pair.append((input, positions))
-    return train_pair
-
-# Split training data by batch-size, and shuffle data in each epoch
-def prepare_train_batch_pretrain(data_train: list, batch_size: int):
-    random.shuffle(data_train)
-    train_pair = copy.deepcopy(data_train)
-    batches = []
-    pos = 0
-
-    while pos + batch_size < len(train_pair):
-        batches.append(train_pair[pos : pos + batch_size])
-        pos += batch_size
-    batches.append(train_pair[pos:])
-
-    train_inputs = []
-    for batch in batches:
-        train_input = []
-        for item in batch:
-            train_input.append((item[0], item[1]))
-        train_inputs.append(train_input)
-
-    return train_inputs
-
-#  Pad the batch with tokenizer.pad_token_id to get the same length inputs.
-def pad_sequence_pretrain(input_ls: list, tokenizer: BertTokenizer, USE_CUDA: bool):
-    max_length = 0
-    xyz_positions = []
-    sequences = []
-    input_s = []
-    for item in input_ls:
-        sequences.append(item[0])
-        xyz_positions.append(item[1])
-        if max_length < len(item[0]):
-            max_length = len(item[0])
-    for i in range(len(xyz_positions)):
-        current_len = len(xyz_positions[i])
-        xyz_positions[i].extend(
-            [[0.0, 0.0, 0.0] for _ in range(max_length - current_len)]
-        )
-
-    input_s = tokenizer(sequences, return_tensors="pt", add_special_tokens=False, padding=True, is_split_into_words=True)
-    xyz_positions = torch.FloatTensor(xyz_positions)
-
-    if USE_CUDA:
-        inputs = {
-            "input_ids": input_s.input_ids.cuda(),
-            "xyz_position": xyz_positions.cuda(),
-            "attention_mask": input_s.attention_mask.cuda(),
-        }
-    else:
-        inputs = {
-            "input_ids": input_s.input_ids,
-            "xyz_position": xyz_positions,
-            "attention_mask": input_s.attention_mask,
-        }
-
-    return inputs
-
-
-'''
-    Functions of ResidueRoberta to achieve TokenClassification
-'''
-def load_data_target(train_file: str, tokenizer: BertTokenizer):
-    with open(train_file, "r") as f:
-        train_set = json.load(f)
-
-    train_pair = []
-
-    print("Processing data...")
-    for item in tqdm(train_set):
-        input = item["input"]["sequence"]
-        if len(input) > 1024:
-            continue
-        x_s = item["input"]["x_s"]
-        y_s = item["input"]["y_s"]
-        z_s = item["input"]["z_s"]
-        positions = []
-        for i in range(len(x_s)):
-            positions.append([x_s[i], y_s[i], z_s[i]])
-
-        target = item["target"]
-        train_pair.append((input, positions, target))
-    return train_pair
-
-def prepare_train_batch(data_train: list, batch_size: int):
-    train_pair = copy.deepcopy(data_train)
-    random.shuffle(train_pair)
-    batches = []
-    pos = 0
-
-    while pos + batch_size < len(train_pair):
-        batches.append(train_pair[pos : pos + batch_size])
-        pos += batch_size
-    batches.append(train_pair[pos:])
-
-    train_inputs = []
-    train_targets = []
-    for batch in batches:
-        train_input = []
-        train_target = []
-        for item in batch:
-            train_input.append((item[0], item[1]))
-            train_target.append(item[2])
-        train_inputs.append(train_input)
-        train_targets.append(train_target)
-
-    return train_inputs, train_targets
-
-def prepare_train_data(data_train: list):
-    train_inputs = []
-    train_targets = []
-    for item in data_train:
-        train_inputs.append((item[0], item[1]))
-        train_targets.append(item[2])
-
-    return train_inputs, train_targets
-
-def prepare_train_batch_adjust(inputs: list, batch_size: int):
-    train_pair = copy.deepcopy(inputs)
-    random.shuffle(train_pair)
-    batches = []
-    pos = 0
-
-    while pos + batch_size < len(train_pair):
-        batches.append(train_pair[pos : pos + batch_size])
-        pos += batch_size
-    batches.append(train_pair[pos:])
-
-    final_inputs = []
-    for batch in batches:
-        input_ids = []
-        xyz_position = []
-        attention_mask = []
-        labels = []
-        for item in batch:
-            input_ids.append(item[0])
-            xyz_position.append(item[1])
-            attention_mask.append(item[2])
-            labels.append(item[3])
-        final_inputs.append(
-            {
-                "input_ids": torch.LongTensor(input_ids),
-                "xyz_position": torch.FloatTensor(xyz_position),
-                "attention_mask": torch.FloatTensor(attention_mask),
-                "labels": torch.LongTensor(labels),
-            }
-        )
-    return final_inputs
-
-def prepare_test_batch(data_train: list, batch_size: int):
-    train_pair = data_train
-    batches = []
-    pos = 0
-
-    while pos + batch_size < len(train_pair):
-        batches.append(train_pair[pos : pos + batch_size])
-        pos += batch_size
-    batches.append(train_pair[pos:])
-
-    train_inputs = []
-    train_targets = []
-    for batch in batches:
-        train_input = []
-        train_target = []
-        for item in batch:
-            train_input.append((item[0], item[1]))
-            train_target.append(item[2])
-        train_inputs.append(train_input)
-        train_targets.append(train_target)
-
-    return train_inputs, train_targets
-
-def pad_sequence(
-    input_ls: list, target_ls: list, tokenizer: BertTokenizer, USE_CUDA: bool
-):
-    max_length = 0
-    xyz_positions = []
-    sequences = []
-    for item in input_ls:
-        sequences.append(item[0])
-        xyz_positions.append(item[1])
-        if max_length < len(item[0]):
-            max_length = len(item[0])
-    for i in range(len(xyz_positions)):
-        while len(xyz_positions[i]) < max_length:
-            xyz_positions[i].append([0.0, 0.0, 0.0])
-
-    input_ls = tokenizer(
-        sequences,
-        return_tensors="pt",
-        add_special_tokens=False,
-        padding=True,
-        is_split_into_words=True,
-    )
-    target_ls = tokenizer(
-        target_ls,
-        return_tensors="pt",
-        add_special_tokens=False,
-        padding=True,
-        is_split_into_words=True,
-    )
-    xyz_positions = torch.Tensor(xyz_positions)
-    if USE_CUDA:
-        inputs = {
-            "input_ids": input_ls.input_ids.cuda(),
-            "xyz_position": xyz_positions.cuda(),
-            "attention_mask": input_ls.attention_mask.cuda(),
-            "labels": target_ls.input_ids.cuda(),
-        }
-    else:
-        inputs = {
-            "input_ids": input_ls.input_ids,
-            "xyz_position": xyz_positions,
-            "attention_mask": input_ls.attention_mask,
-            "labels": target_ls.input_ids,
-        }
-
-    return inputs
-
-def pad_sequence_category(
-    input_ls: list, target_ls: list, tokenizer: BertTokenizer, USE_CUDA: bool
-):
-    max_length = 0
-    xyz_positions = []
-    sequences = []
-    target_s = []
-    input_s = []
-    for item in input_ls:
-        sequences.append(item[0])
-        xyz_positions.append(item[1])
-        if max_length < len(item[0]):
-            max_length = len(item[0])
-    for i in range(len(xyz_positions)):
-        current_len = len(xyz_positions[i])
-        xyz_positions[i].extend(
-            [[0.0, 0.0, 0.0] for _ in range(max_length - current_len)]
-        )
-        target_ls[i].extend([0 for _ in range(max_length - current_len)])
-        target_s.append(target_ls[i])
-
-    input_s = tokenizer(
-        sequences,
-        return_tensors="pt",
-        add_special_tokens=False,
-        padding=True,
-        is_split_into_words=True,
-    )
-    target_s = torch.LongTensor(target_s)
-    xyz_positions = torch.FloatTensor(xyz_positions)
-
-    if USE_CUDA:
-        inputs = {
-            "input_ids": input_s.input_ids.cuda(),
-            "xyz_position": xyz_positions.cuda(),
-            "attention_mask": input_s.attention_mask.cuda(),
-            "labels": target_s.cuda(),
-        }
-    else:
-        inputs = {
-            "input_ids": input_s.input_ids,
-            "xyz_position": xyz_positions,
-            "attention_mask": input_s.attention_mask,
-            "labels": target_s,
-        }
-
-    return inputs
-
-def inputs_to_list(inputs: dict):
-    input_ids = inputs["input_ids"].tolist()
-    xyz_position = inputs["xyz_position"].tolist()
-    attention_mask = inputs["attention_mask"].tolist()
-    labels = inputs["labels"].tolist()
-
-    total_inputs = []
-    for i in range(len(input_ids)):
-        total_inputs.append(
-            (input_ids[i], xyz_position[i], attention_mask[i], labels[i])
-        )
-
-    return total_inputs

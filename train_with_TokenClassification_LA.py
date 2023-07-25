@@ -47,14 +47,14 @@ for n, p in model.named_parameters():
     size += p.nelement()
 print("Total parameters: {}".format(size))
 
-train_pair = load_data_target(train_file, tokenizer)
+train_pair = load_data_target(train_file)
 
 # prepare all trian labels to compute logits adjustment
 train_inputs, train_targets = prepare_train_data(train_pair)
 train_inputs = pad_sequence_category(train_inputs, train_targets, tokenizer, USE_CUDA=False)
 # steps_per_epoch = math.ceil(float(train_inputs["input_ids"].shape[0]) / batch_size)
 
-test_pair = load_data_target(test_file, tokenizer)
+test_pair = load_data_target(test_file)
 test_batches, test_targets = prepare_test_batch(test_pair, batch_size)
 
 if USE_CUDA:

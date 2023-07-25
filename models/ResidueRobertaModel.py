@@ -4,9 +4,9 @@ import torch.nn.functional as F
 from torch.nn.modules import CrossEntropyLoss
 from packaging import version
 from typing import Optional, List, Union, Tuple
-from transformers import RobertaModel, RobertaForMaskedLM, RobertaForTokenClassification
+from transformers import RobertaModel, RobertaForMaskedLM, RobertaForTokenClassification, RobertaForSequenceClassification
 from transformers.models.roberta.modeling_roberta import RobertaEncoder, RobertaPooler, RobertaLMHead
-from transformers.modeling_outputs import BaseModelOutputWithPoolingAndCrossAttentions, MaskedLMOutput, TokenClassifierOutput
+from transformers.modeling_outputs import BaseModelOutputWithPoolingAndCrossAttentions, MaskedLMOutput, TokenClassifierOutput, SequenceClassifierOutput
 
 
 class ResidueRobertaEmbeddings(nn.Module):
@@ -21,6 +21,8 @@ class ResidueRobertaEmbeddings(nn.Module):
         self.position_embeddings = nn.Embedding(config.max_position_embeddings, config.hidden_size)
         self.token_type_embeddings = nn.Embedding(config.type_vocab_size, config.hidden_size)
         self.xyz_embeddings = nn.Linear(3, config.hidden_size)
+        self.orthosteric_embeddings = nn.Embedding(3, config.hidden_size, padding_idx=0)
+        self.pocket_embeddings = nn.Embedding(3, config.hidden_size, padding_idx=0)
 
         # self.LayerNorm is not snake-cased to stick with TensorFlow model variable name and be able to load
         # any TensorFlow checkpoint file
@@ -43,7 +45,7 @@ class ResidueRobertaEmbeddings(nn.Module):
         )
 
     def forward(
-        self, input_ids=None, token_type_ids=None, position_ids=None, xyz_position=None, inputs_embeds=None, past_key_values_length=0
+        self, input_ids=None, token_type_ids=None, position_ids=None, xyz_position=None, orthosteric_position=None, pocket_position=None, inputs_embeds=None, past_key_values_length=0
     ):
         if position_ids is None:
             if input_ids is not None:
@@ -82,6 +84,14 @@ class ResidueRobertaEmbeddings(nn.Module):
         if xyz_position is not None:
             xyz_embeddings = self.xyz_embeddings(xyz_position)
             embeddings += xyz_embeddings
+        
+        if orthosteric_position is not None:
+            orthosteric_embeddings = self.orthosteric_embeddings(orthosteric_position)
+            embeddings += orthosteric_embeddings
+        
+        if pocket_position is not None:
+            pocket_embeddings = self.pocket_embeddings(pocket_position)
+            embeddings += pocket_embeddings
         embeddings = self.LayerNorm(embeddings)
         embeddings = self.dropout(embeddings)
         return embeddings
@@ -138,6 +148,8 @@ class ResidueRobertaModel(RobertaModel):
         token_type_ids: Optional[torch.Tensor] = None,
         position_ids: Optional[torch.Tensor] = None,
         xyz_position: Optional[torch.Tensor] = None,
+        orthosteric_position: Optional[torch.Tensor] = None,
+        pocket_position: Optional[torch.Tensor] = None,
         head_mask: Optional[torch.Tensor] = None,
         inputs_embeds: Optional[torch.Tensor] = None,
         encoder_hidden_states: Optional[torch.Tensor] = None,
@@ -212,6 +224,8 @@ class ResidueRobertaModel(RobertaModel):
             position_ids=position_ids,
             token_type_ids=token_type_ids,
             xyz_position=xyz_position,
+            orthosteric_position = orthosteric_position,
+            pocket_position = pocket_position,
             inputs_embeds=inputs_embeds,
             past_key_values_length=past_key_values_length,
         )
@@ -242,6 +256,9 @@ class ResidueRobertaModel(RobertaModel):
             cross_attentions=encoder_outputs.cross_attentions,
         )
 
+'''
+    Dynamic MLM task for pre-training
+'''
 class ResidueRobertaForMaskedLM(RobertaForMaskedLM):
     _keys_to_ignore_on_save = [r"lm_head.decoder.weight", r"lm_head.decoder.bias"]
     _keys_to_ignore_on_load_missing = [r"position_ids", r"lm_head.decoder.weight", r"lm_head.decoder.bias"]
@@ -324,6 +341,9 @@ class ResidueRobertaForMaskedLM(RobertaForMaskedLM):
             attentions=outputs.attentions,
         )
 
+'''
+    TokenClassification for predict the allosteric site in residue sequence
+'''
 class ResidueRobertaForTokenClassification(RobertaForTokenClassification):
     _keys_to_ignore_on_load_unexpected = [r"pooler"]
     _keys_to_ignore_on_load_missing = [r"position_ids"]
@@ -349,6 +369,8 @@ class ResidueRobertaForTokenClassification(RobertaForTokenClassification):
         token_type_ids: Optional[torch.LongTensor] = None,
         position_ids: Optional[torch.LongTensor] = None,
         xyz_position: Optional[torch.FloatTensor] = None,
+        orthosteric_position: Optional[torch.LongTensor] = None,
+        pocket_position: Optional[torch.LongTensor] = None,
         head_mask: Optional[torch.FloatTensor] = None,
         inputs_embeds: Optional[torch.FloatTensor] = None,
         labels: Optional[torch.LongTensor] = None,
@@ -369,6 +391,8 @@ class ResidueRobertaForTokenClassification(RobertaForTokenClassification):
             token_type_ids=token_type_ids,
             position_ids=position_ids,
             xyz_position=xyz_position,
+            orthosteric_position = orthosteric_position,
+            pocket_position = pocket_position,
             head_mask=head_mask,
             inputs_embeds=inputs_embeds,
             output_attentions=output_attentions,
@@ -402,6 +426,101 @@ class ResidueRobertaForTokenClassification(RobertaForTokenClassification):
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
         )
+
+'''
+    Sequence classification for predict allosteric pocket with residue sequence
+'''
+class ResidueRobertaForSequenceClassification(RobertaForSequenceClassification):
+    _keys_to_ignore_on_load_missing = [r"position_ids"]
+
+    def __init__(self, config):
+        super().__init__(config)
+        self.num_labels = config.num_labels
+        self.config = config
+
+        self.roberta = ResidueRobertaModel(config, add_pooling_layer=False)
+        self.classifier = ResidueRobertaClassificationHead(config)
+
+        # Initialize weights and apply final processing
+        self.post_init()
+
+    def forward(
+        self,
+        input_ids: Optional[torch.LongTensor] = None,
+        attention_mask: Optional[torch.FloatTensor] = None,
+        token_type_ids: Optional[torch.LongTensor] = None,
+        position_ids: Optional[torch.LongTensor] = None,
+        xyz_position: Optional[torch.FloatTensor] = None,
+        orthosteric_position: Optional[torch.LongTensor] = None,
+        pocket_position: Optional[torch.LongTensor] = None,
+        head_mask: Optional[torch.FloatTensor] = None,
+        inputs_embeds: Optional[torch.FloatTensor] = None,
+        labels: Optional[torch.LongTensor] = None,
+        output_attentions: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+    ) -> Union[Tuple[torch.Tensor], SequenceClassifierOutput]:
+        r"""
+        labels (`torch.LongTensor` of shape `(batch_size,)`, *optional*):
+            Labels for computing the sequence classification/regression loss. Indices should be in `[0, ...,
+            config.num_labels - 1]`. If `config.num_labels == 1` a regression loss is computed (Mean-Square loss), If
+            `config.num_labels > 1` a classification loss is computed (Cross-Entropy).
+        """
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+
+        outputs = self.roberta(
+            input_ids,
+            attention_mask=attention_mask,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            xyz_position = xyz_position,
+            orthosteric_position = orthosteric_position,
+            pocket_position = pocket_position,
+            head_mask=head_mask,
+            inputs_embeds=inputs_embeds,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+        sequence_output = outputs[0]
+        logits = self.classifier(sequence_output)
+
+        loss = None
+        if labels is not None:
+            loss_fct = CrossEntropyLoss()
+            loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
+
+        if not return_dict:
+            output = (logits,) + outputs[2:]
+            return ((loss,) + output) if loss is not None else output
+
+        return SequenceClassifierOutput(
+            loss=loss,
+            logits=F.softmax(logits, dim=1),
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+        )
+
+class ResidueRobertaClassificationHead(nn.Module):
+    """Head for sentence-level classification tasks."""
+
+    def __init__(self, config):
+        super().__init__()
+        self.dense = nn.Linear(config.hidden_size, config.hidden_size)
+        classifier_dropout = (
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+        )
+        self.dropout = nn.Dropout(classifier_dropout)
+        self.out_proj = nn.Linear(config.hidden_size, config.num_labels)
+
+    def forward(self, features, **kwargs):
+        x = features[:, 0, :]  # take <s> token (equiv. to [CLS])
+        x = self.dropout(x)
+        x = self.dense(x)
+        x = torch.tanh(x)
+        x = self.dropout(x)
+        x = self.out_proj(x)
+        return x
 
 def create_position_ids_from_input_ids(input_ids, padding_idx, past_key_values_length=0):
     """

@@ -36,7 +36,7 @@ for n, p in model.named_parameters():
     size += p.nelement()
 print("Total parameters: {}".format(size))
 
-test_pair = load_data_target(test_file, tokenizer)
+test_pair = load_data_target(test_file)
 test_batches, test_targets = prepare_test_batch(test_pair, batch_size)
 
 if USE_CUDA:
