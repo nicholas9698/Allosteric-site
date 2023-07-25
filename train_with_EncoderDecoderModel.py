@@ -24,7 +24,7 @@ n_epoch = 80
 seed = 42
 train_file = "data/allosteric_site/data_train.json"
 test_file = "data/allosteric_site/data_test.json"
-output_dir = "test/"
+output_dir = "models/fine-tuned/encoder_decoder/"
 
 
 def set_seed(seed: int):

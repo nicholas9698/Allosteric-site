@@ -23,7 +23,7 @@ n_epoch = 80
 seed = 42
 train_file = "data/allosteric_site/data_train.json"
 test_file = "data/allosteric_site/data_test.json"
-output_dir = "test_CrossEntropy/"
+output_dir = "models/fine-tuned/token_classification_CE/"
 
 
 def set_seed(seed: int):
