@@ -7,7 +7,7 @@ This is the offcial repo for the xxx paper "[xxx](https://google.com)".
    
 2. Execute the `Build the dataset for pretrain ResidueRobertaMLM` in `data_processing.ipynb` to process the pdb file and build the pre-training data.
 
-3.  Run the following for the ResidueRoBERTa pre-training:
+3.  Run the following to pre-train the Residue-RoBERTa:
 ```
 python -u pretrain_ResidueRoberta.py
 ```
