@@ -114,6 +114,7 @@ for epoch in range(n_epoch):
             test_output = model(
                 input_ids=test_batch["input_ids"],
                 xyz_position=test_batch["xyz_position"],
+                pocket_position=test_batch["pocket_position"],
                 attention_mask=test_batch["attention_mask"],
                 labels=None,
                 adjustment=None

@@ -387,19 +387,22 @@ def pad_sequence_seq(input_ls: list, target_ls: list, tokenizer: BertTokenizer, 
     xyz_positions = []
     sequences = []
     target_s = []
+    pocket_s = []
     input_s = []
     for item in input_ls:
         sequences.append(item[0])
         xyz_positions.append(item[1])
+        pocket_s.append(item[2])
         if max_length < len(item[0]):
             max_length = len(item[0])
     for i in range(len(xyz_positions)):
         xyz_positions[i].insert(0, [0.0, 0.0, 0.0])
         xyz_positions[i].append([0.0, 0.0, 0.0])
-        current_len = len(xyz_positions[i])
-        xyz_positions[i].extend(
-            [[0.0, 0.0, 0.0] for _ in range(max_length - current_len)]
-        )
+        pocket_s[i].insert(0, 0)
+        pocket_s[i].append(0)
+        current_len = len(xyz_positions[i]) - 2 
+        xyz_positions[i].extend([[0.0, 0.0, 0.0] for _ in range(max_length - current_len)])
+        pocket_s[i].extend([0 for _ in range(max_length - current_len)])
 
     input_s = tokenizer(
         sequences,
@@ -409,11 +412,13 @@ def pad_sequence_seq(input_ls: list, target_ls: list, tokenizer: BertTokenizer, 
     )
     target_s = torch.LongTensor(target_ls)
     xyz_positions = torch.FloatTensor(xyz_positions)
+    pocket_s = torch.LongTensor(pocket_s)
 
     if USE_CUDA:
         inputs = {
             "input_ids": input_s.input_ids.cuda(),
             "xyz_position": xyz_positions.cuda(),
+            "pocket_position": pocket_s.cuda(),
             "attention_mask": input_s.attention_mask.cuda(),
             "labels": target_s.cuda(),
         }
@@ -421,6 +426,7 @@ def pad_sequence_seq(input_ls: list, target_ls: list, tokenizer: BertTokenizer, 
         inputs = {
             "input_ids": input_s.input_ids,
             "xyz_position": xyz_positions,
+            "pocket_position": pocket_s,
             "attention_mask": input_s.attention_mask,
             "labels": target_s,
         }
