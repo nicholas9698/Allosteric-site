@@ -31,12 +31,12 @@ def load_data_target(train_file: str, pocket_classification: bool = False):
                 positions.append([x_s[i], y_s[i], z_s[i]])
 
             target = item["target"]
-            
+            pocket_position = item["input"]["pocket_input"]
             if "orthosite" in item["input"].keys():
                 orthosite = item["input"]["orthosite"]
-                train_pair.append((input, positions, target, orthosite))
+                train_pair.append((input, positions, pocket_position, orthosite, target))
             else:
-                 train_pair.append((input, positions, target))
+                 train_pair.append((input, positions, pocket_position, target))
            
         return train_pair
     else:
@@ -86,8 +86,8 @@ def prepare_test_batch(data_train: list, batch_size: int):
             train_input = []
             train_target = []
             for item in batch:
-                train_input.append((item[0], item[1], item[3]))
-                train_target.append(item[2])
+                train_input.append((item[0], item[1], item[2]))
+                train_target.append(item[3])
             train_inputs.append(train_input)
             train_targets.append(train_target)
     elif count_input == 3:
@@ -122,8 +122,8 @@ def prepare_train_batch(data_train: list, batch_size: int):
             train_input = []
             train_target = []
             for item in batch:
-                train_input.append((item[0], item[1], item[3]))
-                train_target.append(item[2])
+                train_input.append((item[0], item[1], item[2]))
+                train_target.append(item[3])
             train_inputs.append(train_input)
             train_targets.append(train_target)
     elif count_input == 3:
