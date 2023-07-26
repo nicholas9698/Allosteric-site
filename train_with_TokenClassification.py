@@ -21,8 +21,8 @@ learning_rate = 5e-5
 weight_decay = 1e-5
 n_epoch = 80
 seed = 42
-train_file = "data/allosteric_site/data_train.json"
-test_file = "data/allosteric_site/data_test.json"
+train_file = "data/allosteric_site/data_train_orthosite.json"
+test_file = "data/allosteric_site/data_test_orthosite.json"
 output_dir = "models/fine-tuned/token_classification_CE/"
 
 
@@ -35,8 +35,8 @@ def set_seed(seed: int):
 
 set_seed(seed)
 
-model = ResidueRobertaForTokenClassification.from_pretrained("models/residue-roberta", num_labels=3)
-tokenizer = BertTokenizer.from_pretrained("models/residue-roberta")
+model = ResidueRobertaForTokenClassification.from_pretrained("models/pretrained_model", num_labels=3)
+tokenizer = BertTokenizer.from_pretrained("models/pretrained_model")
 
 # model size
 size = 0
@@ -116,6 +116,7 @@ for epoch in range(n_epoch):
             test_output = model(
                 input_ids=test_batch["input_ids"],
                 xyz_position=test_batch["xyz_position"],
+                orthosteric_position=test_batch["orthosteric_position"],
                 attention_mask=test_batch["attention_mask"],
                 labels=None,
                 adjustment=None
