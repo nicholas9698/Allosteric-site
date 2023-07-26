@@ -451,6 +451,7 @@ class ResidueRobertaForSequenceClassification(RobertaForSequenceClassification):
         xyz_position: Optional[torch.FloatTensor] = None,
         orthosteric_position: Optional[torch.LongTensor] = None,
         pocket_position: Optional[torch.LongTensor] = None,
+        adjustment: Optional[torch.FloatTensor] = None,
         head_mask: Optional[torch.FloatTensor] = None,
         inputs_embeds: Optional[torch.FloatTensor] = None,
         labels: Optional[torch.LongTensor] = None,
