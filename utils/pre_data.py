@@ -309,8 +309,8 @@ def pad_sequence_seq(input_ls: list, target_ls: list, tokenizer: BertTokenizer, 
         if max_length < len(item[0]):
             max_length = len(item[0])
     for i in range(len(xyz_positions)):
-        xyz_positions.insert(0, [0.0, 0.0, 0.0])
-        xyz_positions.append([0.0, 0.0, 0.0])
+        xyz_positions[i].insert(0, [0.0, 0.0, 0.0])
+        xyz_positions[i].append([0.0, 0.0, 0.0])
         current_len = len(xyz_positions[i])
         xyz_positions[i].extend(
             [[0.0, 0.0, 0.0] for _ in range(max_length - current_len)]
