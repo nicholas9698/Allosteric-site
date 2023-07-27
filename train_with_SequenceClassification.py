@@ -3,7 +3,7 @@ import torch
 import time
 import random
 import numpy as np
-from utils.tools import time_since, get_labels
+from utils.tools import time_since, get_labels, compute_adjustment
 from torch.optim import AdamW
 from transformers import BertTokenizer, get_linear_schedule_with_warmup
 from utils.pre_data import (
@@ -75,6 +75,9 @@ scheduler = get_linear_schedule_with_warmup(
 
 model.zero_grad()
 
+target_loader = {"labels": torch.LongTensor([_[3] for _ in train_pair])}
+adjustment = compute_adjustment(target_loader, tro=1.0, USE_CUDA=USE_CUDA)
+
 for epoch in range(n_epoch):
     loss_total = 0
     print("epoch", epoch + 1)
@@ -87,7 +90,8 @@ for epoch in range(n_epoch):
         inputs = pad_sequence_seq(
             data_batches[idx], target_batches[idx], tokenizer, USE_CUDA
         )
-
+        inputs["adjustment"] = adjustment
+        
         loss = model(**inputs).loss
         loss.backward()
         loss_total += (loss.item() / len(data_batches))

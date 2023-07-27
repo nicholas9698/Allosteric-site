@@ -382,7 +382,9 @@ def inputs_to_list(inputs: dict):
 '''
     Function for SequenceClassification
 '''
-def pad_sequence_seq(input_ls: list, target_ls: list, tokenizer: BertTokenizer, USE_CUDA: bool):
+def pad_sequence_seq(input_ls: list, target_ls: list, tokenizer: BertTokenizer, USE_CUDA: bool, deepcopy: bool = False):
+    if deepcopy:
+        input_ls = copy.deepcopy(input_ls)
     max_length = 0
     xyz_positions = []
     sequences = []

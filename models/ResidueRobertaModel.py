@@ -484,6 +484,11 @@ class ResidueRobertaForSequenceClassification(RobertaForSequenceClassification):
         sequence_output = outputs[0]
         logits = self.classifier(sequence_output)
 
+        # logits adjustment
+        # 2) Logit-adjusted loss
+        if adjustment is not None:
+            logits = logits + adjustment
+
         loss = None
         if labels is not None:
             loss_fct = CrossEntropyLoss()
