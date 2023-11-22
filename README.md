@@ -1,5 +1,15 @@
+<!--
+ * @Author: nicho-UJN nicholas9698@outlook.com
+ * @Date: 2023-06-16 10:54:19
+ * @LastEditors: nicho-UJN nicholas9698@outlook.com
+ * @LastEditTime: 2023-11-22 17:07:18
+ * @FilePath: /Allosteric-site/README.md
+ * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
+-->
 # Allosteric-site
-This is the offcial repo for the xxx paper "[xxx](https://google.com)".
+~~This is the offcial repo for the [ICAICE 2023](http://www.event-icaice.org/) paper "*A Protein Structure Enhanced Pre-training Model for Allosteric Site Detection*".~~
+
+***For the latest official source code, please refer to https://github.com/Little-LL.***
 
 ## Pre-training
 
@@ -17,7 +27,7 @@ When an error occurs, the `resume_pretraining.py` can be executed to continue th
 python -u pretrain_ResidueRoberta.py
 ```
 
-> Our pre-trained checkpoints can be obtained from https://drive.google.com/drive/folders/1Q6cd4mTw7Imd9fdiz8qttbF_27_oGMPI?usp=drive_link
+> Our pre-trained checkpoints can be obtained from ~~https://drive.google.com/drive/folders/1Q6cd4mTw7Imd9fdiz8qttbF_27_oGMPI?usp=drive_link~~
 
 ## Train and Test
 
@@ -50,16 +60,16 @@ We reproduce the main results of **Allosteric site classification** and **Allost
 | Metric | Site classification | Pocket classification |
 | :--- | :---: | :---: |
 Residue
-| residue acc | 97.6 | - |
-| residue precision | 80.1 | - |
-| residue recall | 86.1 | - |
-| residue f1 | 80.0 | - |
-| sequence acc | 20.1 | - |
+| residue acc | - | - |
+| residue precision | - | - |
+| residue recall | - | - |
+| residue f1 | - | - |
+| sequence acc | - | - |
 Pocket
-| pocket acc | 80.0 | 97.0 |
-| pocket precision | 80.1 | 90.0 |
-| pocket recall | 86.1 | 96.0 |
-| pocket f1 | 80.0 | 84.0 |
+| pocket acc | - | - |
+| pocket precision | - | - |
+| pocket recall | - | - |
+| pocket f1 | - | - |
 
 ## Dataset
 
