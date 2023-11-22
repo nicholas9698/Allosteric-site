@@ -1,7 +1,16 @@
+'''
+Author: nicho-UJN nicholas9698@outlook.com
+Date: 2023-07-20 10:13:29
+LastEditors: nicho-UJN nicholas9698@outlook.com
+LastEditTime: 2023-09-24 11:48:15
+FilePath: /Allosteric-site/utils/tools.py
+Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
+'''
 import math
 import torch
 import numpy as np
 from transformers import BertTokenizer
+from Bio import Align
 
 # compute time
 def time_since(s):
@@ -73,3 +82,12 @@ def mask_tokens(inputs:torch.LongTensor=None, tokenizer:BertTokenizer=None, mlm_
 
         # The rest of the time (10% of the time) we keep the masked input tokens unchanged
         return inputs, labels
+
+def compute_seq_identity(seq1: str, seq2: str):
+    aligner = Align.PairwiseAligner()
+    alignments = aligner.align(seq1, seq2)
+    seq1_aligned = alignments[0][0]
+    align_score = alignments.score
+    seq_identity = align_score / len(seq1_aligned)
+
+    return seq_identity

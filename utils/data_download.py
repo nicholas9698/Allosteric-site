@@ -81,14 +81,15 @@ def wtriting_to_log(file_name: str, contents, mode=1):
             f.writelines(contents + "\n")
 
 
-def download_pretarining_data(list_path: str, outpath: str):
+def download_pretarining_data(list_path: str="", outpath: str="", pdb_list: list=None):
     max_process_number = 11
     filename_extension = ".pdb.gz"
     base_url = "https://files.rcsb.org/download/"
-
-    with open(list_path, "r") as f:
-        file_list = f.readline().strip().split(",")
-
+    if pdb_list == None:
+        with open(list_path, "r") as f:
+            file_list = f.readline().strip().split(",")
+    else:
+        file_list = pdb_list
     threads_group = []
     succeed_count = 0
     linkerror_count = 0
@@ -232,10 +233,13 @@ def download_shsmu_as(allosteric_site_path: str, outpath: str):
             filename.append(file.replace(filename_extension, "").upper())
     for item in tqdm(data):
         if item["allosteric_site"] not in filename:
-            wget.download(
-                base_url + item["allosteric_site"] + filename_extension,
-                outpath + item["allosteric_site"] + filename_extension,
-            )
+            try:
+                wget.download(
+                    base_url + item["allosteric_site"] + filename_extension,
+                    outpath + item["allosteric_site"] + filename_extension,
+                )
+            except:
+                print("Fail to download "+item["allosteric_site"]+'!')
 
 
 # download corresponding pdbs of the shsmu allosteric site
@@ -253,10 +257,13 @@ def download_rcsb(allosteric_site_path: str, outpath: str):
 
     for item in tqdm(data):
         if item["allosteric_pdb"] not in filename:
-            wget.download(
-                base_url + item["allosteric_pdb"] + filename_extension,
-                outpath + item["allosteric_pdb"] + filename_extension,
-            )
+            try:
+                wget.download(
+                    base_url + item["allosteric_pdb"] + filename_extension,
+                    outpath + item["allosteric_pdb"] + filename_extension,
+                )
+            except:
+                print("Fail to download "+item["allosteric_pdb"]+'!')
 
 
 # download_shsmu_as(allosteric_site_path='../data/allosteric_site_shsmu.json', outpath='../data/allosteric_site/')

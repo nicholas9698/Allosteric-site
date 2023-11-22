@@ -91,7 +91,7 @@ for epoch in range(n_epoch):
             data_batches[idx], target_batches[idx], tokenizer, USE_CUDA
         )
         inputs["adjustment"] = adjustment
-        
+
         loss = model(**inputs).loss
         loss.backward()
         loss_total += (loss.item() / len(data_batches))
@@ -118,7 +118,8 @@ for epoch in range(n_epoch):
             test_output = model(
                 input_ids=test_batch["input_ids"],
                 xyz_position=test_batch["xyz_position"],
-                pocket_position=test_batch["pocket_position"],
+                pocket_position=None,
+                token_type_ids=test_batch["token_type_ids"],
                 attention_mask=test_batch["attention_mask"],
                 labels=None,
                 adjustment=None

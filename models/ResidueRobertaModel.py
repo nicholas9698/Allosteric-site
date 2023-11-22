@@ -518,7 +518,8 @@ class ResidueRobertaClassificationHead(nn.Module):
         self.out_proj = nn.Linear(config.hidden_size, config.num_labels)
 
     def forward(self, features, **kwargs):
-        x = features[:, 0, :]  # take <s> token (equiv. to [CLS])
+        # x = features[:, 0, :]  # take <s> token (equiv. to [CLS])
+        x = features.mean(dim=1)
         x = self.dropout(x)
         x = self.dense(x)
         x = torch.tanh(x)

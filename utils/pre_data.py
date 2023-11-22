@@ -20,8 +20,9 @@ def load_data_target(train_file: str, pocket_classification: bool = False):
         print("Processing data...")
         for item in tqdm(train_set):
             input = item["input"]["sequence"]
+            indecies = [i for i,j in enumerate(item["input"]["pocket_input"]) if j == 2]
             # The [CLS] and [EOS] are added for sequence classification
-            if len(input) > (1024-2):
+            if (len(input)+len(indecies)) > 1024:
                 continue
             x_s = item["input"]["x_s"]
             y_s = item["input"]["y_s"]
@@ -36,8 +37,10 @@ def load_data_target(train_file: str, pocket_classification: bool = False):
                 orthosite = item["input"]["orthosite"]
                 train_pair.append((input, positions, pocket_position, orthosite, target))
             else:
-                 train_pair.append((input, positions, pocket_position, target))
-           
+                train_pair.append((input, positions, pocket_position, target))
+
+        print("Load data with (sequence+pocket) <= 1024: ", len(train_pair))
+
         return train_pair
     else:
         with open(train_file, "r") as f:
@@ -48,7 +51,7 @@ def load_data_target(train_file: str, pocket_classification: bool = False):
         print("Processing data...")
         for item in tqdm(train_set):
             input = item["input"]["sequence"]
-            if len(input) > (1024-2):
+            if len(input) > 1024:
                 continue
             x_s = item["input"]["x_s"]
             y_s = item["input"]["y_s"]
@@ -63,7 +66,9 @@ def load_data_target(train_file: str, pocket_classification: bool = False):
                 orthosite = item["input"]["orthosite"]
                 train_pair.append((input, positions, target, orthosite))
             else:
-                 train_pair.append((input, positions, target))
+                train_pair.append((input, positions, target))
+
+        print("Load data with sequence <= 1024: ", len(train_pair))
 
         return train_pair
     
@@ -391,36 +396,48 @@ def pad_sequence_seq(input_ls: list, target_ls: list, tokenizer: BertTokenizer, 
     target_s = []
     pocket_s = []
     input_s = []
+    token_type_ids = []
     for item in input_ls:
         sequences.append(item[0])
+        token_type_ids.append([0 for _ in range(len(item[0]))])
         xyz_positions.append(item[1])
-        pocket_s.append(item[2])
-        if max_length < len(item[0]):
-            max_length = len(item[0])
+        # pocket_s.append(item[2])
+        pocket_s.append([i for i,j in enumerate(item[2]) if j == 2])
+        if max_length < (len(item[0]) + len(pocket_s[-1])):
+            max_length = len(item[0]) + len(pocket_s[-1])
     for i in range(len(xyz_positions)):
-        xyz_positions[i].insert(0, [0.0, 0.0, 0.0])
-        xyz_positions[i].append([0.0, 0.0, 0.0])
-        pocket_s[i].insert(0, 0)
-        pocket_s[i].append(0)
-        current_len = len(xyz_positions[i]) - 2 
+        # xyz_positions[i].insert(0, [0.0, 0.0, 0.0])
+        # xyz_positions[i].append([0.0, 0.0, 0.0])
+        # pocket_s[i].insert(0, 0)
+        # pocket_s[i].append(0)
+        # current_len = len(xyz_positions[i]) - 2 
+
+        for idx in pocket_s[i]:
+            sequences[i].append(sequences[i][idx])
+            xyz_positions[i].append(xyz_positions[i][idx])
+            token_type_ids[i].append(1)
+        current_len = len(xyz_positions[i])
         xyz_positions[i].extend([[0.0, 0.0, 0.0] for _ in range(max_length - current_len)])
-        pocket_s[i].extend([0 for _ in range(max_length - current_len)])
+        # pocket_s[i].extend([0 for _ in range(max_length - current_len)])
+        token_type_ids[i].extend([1 for _ in range(max_length - current_len)])
 
     input_s = tokenizer(
         sequences,
         return_tensors="pt",
         padding=True,
+        add_special_tokens=False,
         is_split_into_words=True,
     )
     target_s = torch.LongTensor(target_ls)
     xyz_positions = torch.FloatTensor(xyz_positions)
-    pocket_s = torch.LongTensor(pocket_s)
+    token_type_ids = torch.LongTensor(token_type_ids)
 
     if USE_CUDA:
         inputs = {
             "input_ids": input_s.input_ids.cuda(),
             "xyz_position": xyz_positions.cuda(),
-            "pocket_position": pocket_s.cuda(),
+            "pocket_position": None,
+            "token_type_ids": token_type_ids.cuda(),
             "attention_mask": input_s.attention_mask.cuda(),
             "labels": target_s.cuda(),
         }
@@ -428,7 +445,8 @@ def pad_sequence_seq(input_ls: list, target_ls: list, tokenizer: BertTokenizer, 
         inputs = {
             "input_ids": input_s.input_ids,
             "xyz_position": xyz_positions,
-            "pocket_position": pocket_s,
+            "pocket_position": None,
+            "token_type_ids": token_type_ids,
             "attention_mask": input_s.attention_mask,
             "labels": target_s,
         }
@@ -525,6 +543,47 @@ def pre_data(target_dir: str, pdb_dir: str, output_json: str):
     for target in tqdm(target_jsons):
         with open(target_dir + target, "r") as f:
             ls = json.load(f)
+        with open(pdb_dir + target[-11:-7].upper() + ".json", "r") as f:
+            origin = json.load(f)
+        for item in ls:
+            now_pdbid_chain = item["pdbid"][-6:-2] + item["chain"]
+            if now_pdbid_chain not in pdbid_chain:
+                temp = {
+                    "pdbid": item["pdbid"][-6:-2],
+                    "chain": item["chain"],
+                    "target_orders": item["orders"],
+                }
+                data.append(temp)
+                for single in origin:
+                    if single["chain"] == (data[-1])["chain"]:
+                        data[-1]["origin_orders"] = single["orders"]
+                        data[-1]["residues"] = single["residues"]
+                        data[-1]["positions"] = single["positions"]
+                        break
+                pdbid_chain.append(now_pdbid_chain)
+            else:
+                pos = pdbid_chain.index(now_pdbid_chain)
+                temp_orders = item["orders"].strip().split()
+                previous_orders = (data[pos])["target_orders"].strip().split()
+                temp_orders.extend(previous_orders)
+                temp_orders = list(set(temp_orders))
+                temp_orders = list(map(int, temp_orders))
+                temp_orders = sorted(temp_orders)
+                temp_orders = list(map(str, temp_orders))
+                (data[pos])["target_orders"] = " ".join(temp_orders)
+
+    with open(output_json, "w") as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
+
+def pre_data_uni(target_dir: str, pdb_dir: str, output_json: str):
+    target_jsons = os.listdir(target_dir)
+    data = []
+    pdbid_chain = []
+    for target in tqdm(target_jsons):
+        with open(target_dir + target, "r") as f:
+            ls = json.load(f)
+        if len(ls) > 1:
+            continue
         with open(pdb_dir + target[-11:-7].upper() + ".json", "r") as f:
             origin = json.load(f)
         for item in ls:
